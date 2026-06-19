@@ -414,17 +414,22 @@ function pointsForPrediction(pa, pb, ra, rb, isAuto) {
 // =================================================================
 // يحسب ترتيب فرق مجموعة معيّنة (1 إلى 4) بالاستناد إلى نتائج معطاة
 // (سواء كانت نتائج حقيقية أو توقعات مستخدم). يعيد:
-// { order: [اسم الفريق الأول, الثاني, الثالث, الرابع] أو null لو غير مكتمل,
-//   isComplete: هل كل المباريات الست موجودة فيها نتيجة,
-//   hasTie: هل يوجد تعادل بالنقاط بين أي فريقين }
+// { order: [اسم الفريق الأول, الثاني, الثالث, الرابع],
+//   isComplete: هل كل المباريات الست (وفقط الست) موجودة فيها نتيجة صحيحة,
+//   hasTie: هل يوجد تعادل بالنقاط بين أي فريقين في الترتيب }
+//
+// ✅ تشديد: matchesWithResult يجب أن يساوي بالضبط عدد مباريات المجموعة
+// (6 مباريات). أي قيمة ناقصة أو غير صالحة (فارغة/null/undefined/غير رقمية)
+// تجعل isComplete = false فوراً، ولا يُحسب أي ترتيب نهائي لهذه الحالة.
 // =================================================================
 function computeGroupOrder(groupKey, resultsObj) {
+    const safeResults = resultsObj || {};
     let stats = {};
     groupsData[groupKey].teams.forEach(t => { stats[t] = { name: t, pts: 0 }; });
 
     let matchesWithResult = 0;
     groupsData[groupKey].matches.forEach(m => {
-        const res = resultsObj[m.id];
+        const res = safeResults[m.id];
         if (res && isValidScore(res.a) && isValidScore(res.b)) {
             matchesWithResult++;
             let a = parseInt(res.a, 10), b = parseInt(res.b, 10);
@@ -434,7 +439,9 @@ function computeGroupOrder(groupKey, resultsObj) {
         }
     });
 
-    const isComplete = matchesWithResult === groupsData[groupKey].matches.length;
+    const totalMatches = groupsData[groupKey].matches.length; // 6 لكل مجموعة
+    const isComplete = matchesWithResult === totalMatches;
+
     const sorted = Object.values(stats).sort((x, y) => y.pts - x.pts);
 
     let hasTie = false;
@@ -450,21 +457,47 @@ function computeGroupOrder(groupKey, resultsObj) {
 }
 
 // =================================================================
-// يحسب نقاط مكافأة ترتيب المجموعة لمستخدم معيّن في مجموعة معيّنة.
-// يعطي 3 نقاط فقط إذا تطابق الترتيب الكامل (1 إلى 4) تماماً، وبدون
-// أي نقاط جزئية. لا تُحسب المكافأة إطلاقاً إذا كانت المجموعة غير
-// مكتملة (لم تُسجَّل كل المباريات الحقيقية)، أو إذا كان هناك تعادل
-// بالنقاط في الترتيب الحقيقي أو ترتيب التوقع.
+// 🏆 نقاط ترتيب المجموعة (القاعدة الجديدة): 1 نقطة فقط لكل مجموعة
+// متوقَّعة بشكل صحيح 100%، بحد أقصى 12 نقطة (1 × 12 مجموعة).
+//
+// الشروط الصارمة لمنح النقطة (Rule 1 + Rule 2):
+// 1) يجب أن تكون المجموعة الحقيقية مكتملة بالكامل: الست مباريات لها
+//    نتيجة حقيقية صحيحة مُدخلة من الأدمن. أي مباراة ناقصة = 0 نقطة فوراً.
+// 2) لا يوجد أي تعادل بالنقاط بين الفرق في الترتيب الحقيقي (وإلا فالترتيب
+//    غير محدد بشكل قاطع، فلا تُمنح أي نقطة لأي مستخدم في هذه الحالة).
+// 3) يجب أن يكون توقع المستخدم نفسه أيضاً غير متعادل (أي أن المستخدم
+//    فعلاً رتّب الفرق 1-2-3-4 بشكل حاسم عبر توقعاته للمباريات الست،
+//    وليس توقعاً ناقصاً أو فارغاً يُنتج تعادلاً صورياً بين الفرق).
+// 4) ترتيب التوقع (1 إلى 4) يجب أن يطابق الترتيب الحقيقي حرفياً وبالكامل.
+//
+// ✅ هذا يمنع تماماً مشكلة "نقاط فورية عند التسجيل": مستخدم جديد بلا
+// أي توقعات محفوظة سيحصل على hasTie = true (كل الفرق متعادلة عند 0 نقطة)
+// في دالة computeGroupOrder الخاصة بتوقعاته، وبالتالي صفر نقطة دائماً،
+// بغض النظر عن حالة النتائج الحقيقية.
 // =================================================================
 function computeGroupBonus(groupKey, realResults, userPredictions) {
     const real = computeGroupOrder(groupKey, realResults);
-    if (!real.isComplete || real.hasTie) return 0;
+    if (!real.isComplete || real.hasTie) return 0; // Rule 1: المجموعة غير مكتملة بعد
 
     const predicted = computeGroupOrder(groupKey, userPredictions);
-    if (predicted.hasTie) return 0;
+    if (!predicted.isComplete || predicted.hasTie) return 0; // توقع ناقص أو متعادل لا يُحسب
 
     const exactMatch = real.order.every((team, i) => team === predicted.order[i]);
-    return exactMatch ? 3 : 0;
+    return exactMatch ? 1 : 0; // Rule 2: نقطة واحدة فقط للترتيب الصحيح 100%
+}
+
+// =================================================================
+// 🔢 يحسب إجمالي نقاط الترتيب لكل المجموعات الـ 12 لمستخدم معيّن.
+// الحد الأقصى النظري: 12 نقطة (1 نقطة × 12 مجموعة).
+// تُستخدم هذه الدالة في الـ Leaderboard وفي عرض المجموعة الحالية، لضمان
+// أن القيمة نفسها تُحسب دائماً بنفس الطريقة في كل مكان (Rule 3).
+// =================================================================
+function computeAllGroupsBonus(realResults, userPredictions) {
+    let total = 0;
+    Object.keys(groupsData).forEach(g => {
+        total += computeGroupBonus(g, realResults, userPredictions);
+    });
+    return total;
 }
 
 // ✅ ملاحظة أمان: قبل أي حفظ، نتحقق أولاً من آخر نسخة محفوظة من النتائج
@@ -581,7 +614,7 @@ function calculateSystem(realResults, userPredictions) {
         }
     });
 
-    // ✅ مكافأة توقع ترتيب المجموعة بالكامل (3 نقاط إضافية لو الترتيب مطابق تماماً)
+    // ✅ مكافأة توقع ترتيب المجموعة بالكامل (1 نقطة إضافية لو الترتيب مطابق تماماً، فقط إذا اكتملت كل نتائج المجموعة الحقيقية)
     const groupBonus = computeGroupBonus(currentGroup, realResults, userPredictions);
     challengePoints += groupBonus;
 
@@ -598,7 +631,7 @@ function calculateSystem(realResults, userPredictions) {
             bonusBadge.style.display = "none";
         } else if (groupBonus > 0) {
             bonusBadge.style.display = "block";
-            bonusBadge.textContent = `🏆 مبروك! توقعت ترتيب هذه المجموعة بالكامل بشكل صحيح: +3 نقاط`;
+            bonusBadge.textContent = `🏆 مبروك! توقعت ترتيب هذه المجموعة بالكامل بشكل صحيح: +1 نقطة`;
         } else {
             bonusBadge.style.display = "none";
         }
@@ -661,10 +694,8 @@ function updateLeaderboard() {
                         }
                     });
 
-                    // ✅ إضافة مكافأة ترتيب المجموعة الكاملة (3 نقاط لكل مجموعة توقّعها بالكامل بشكل صحيح)
-                    Object.keys(groupsData).forEach(g => {
-                        totalPoints += computeGroupBonus(g, real, userPreds);
-                    });
+                    // ✅ إضافة نقاط ترتيب المجموعات (1 نقطة لكل مجموعة متوقَّعة بشكل صحيح 100%، فقط بعد اكتمالها بالكامل - حد أقصى 12 نقطة)
+                    totalPoints += computeAllGroupsBonus(real, userPreds);
 
                     scores.push({ user, points: totalPoints });
                 }
