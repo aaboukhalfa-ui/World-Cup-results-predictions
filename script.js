@@ -11,7 +11,7 @@ const firebaseConfig = {
   measurementId: "G-9TVP7VS1N7"
 };
 
-// كلمة مرور المالك (2026) للتحكم بالقفل وتغيير الأسماء وتسجيل النتائج
+// كلمة مرور المالك (2026) للتحكم بالقفل الفردي للمباريات وتسجيل النتائج
 const ADMIN_PASSWORD = "2026";
 
 let firebaseReady = false;
@@ -22,7 +22,7 @@ try {
     db = firebase.firestore();
     firebaseReady = true;
 } catch (e) {
-    console.error("فشل الاتصال بـ Firebase. تأكد من ضبط firebaseConfig بشكل صحيح.", e);
+    console.error("فشل الاتصال بـ Firebase.", e);
 }
 
 let currentUser = localStorage.getItem("prediction_user") || "";
@@ -30,9 +30,8 @@ let currentUserDisplay = localStorage.getItem("prediction_user_display") || curr
 let currentGroup = 'A';
 let currentMode = 'predict';
 let authMode = 'login'; 
-let globalIsLocked = false; // التحكم بالقفل اليدوي من قبل الأدمن (بدون وقت)
 
-// قاعدة البيانات (تم إزالة توقيت kickoffTime لأنه تم التخلي عن العدادات)
+// بيانات المجموعات (لا توجد توقيتات)
 const groupsData = {
     A: { name: "المجموعة الأولى", teams: ["المكسيك 🇲🇽", "جنوب إفريقيا 🇿🇦", "كوريا الجنوبية 🇰🇷", "جمهورية التشيك 🇨🇿"],
          matches: [{id:"A1",tA:"المكسيك 🇲🇽",tB:"جنوب إفريقيا 🇿🇦"},{id:"A2",tA:"كوريا الجنوبية 🇰🇷",tB:"جمهورية التشيك 🇨🇿"},{id:"A3",tA:"المكسيك 🇲🇽",tB:"كوريا الجنوبية 🇰🇷"},{id:"A4",tA:"جنوب إفريقيا 🇿🇦",tB:"جمهورية التشيك 🇨🇿"},{id:"A5",tA:"المكسيك 🇲🇽",tB:"جمهورية التشيك 🇨🇿"},{id:"A6",tA:"كوريا الجنوبية 🇰🇷",tB:"جنوب إفريقيا 🇿🇦"}] },
@@ -61,7 +60,7 @@ const groupsData = {
 };
 
 // =================================================================
-// وظيفة الإدارة المسترجعة 100%: تغيير اسم عرض اللاعب (Moderation)
+// وظيفة الإدارة: تغيير اسم عرض اللاعب (Moderation)
 // =================================================================
 function renameUserByAdmin() {
     let targetId = document.getElementById("admin-target-id").value.trim().toLowerCase();
@@ -96,53 +95,26 @@ function renameUserByAdmin() {
 }
 
 // =================================================================
-// وظيفة الإدارة الجديدة: قفل أو فتح التوقعات عالمياً بضغطة زر
+// وظيفة الإدارة الفردية: قفل/فتح التوقعات لكل مباراة على حدة
 // =================================================================
-function toggleGlobalLock() {
+function toggleMatchLock(matchId, isCurrentlyLocked) {
     if (!firebaseReady) return;
-    let targetState = !globalIsLocked;
-    
-    db.collection("settings").doc("global").set({ isLocked: targetState }, { merge: true }).then(() => {
-        globalIsLocked = targetState;
-        alert(targetState ? "🔒 تم قفل جميع التوقعات بنجاح!" : "🔓 تم فتح باب التوقعات لجميع اللاعبين!");
-        loadData();
-    }).catch(err => {
-        console.error(err);
-        alert("❌ فشل تحديث حالة القفل في السحابة.");
+    let newState = !isCurrentlyLocked;
+
+    db.collection("worldcup2026").doc("real_results").get().then(doc => {
+        let data = doc.exists ? doc.data() : {};
+        let matchData = data[matchId] || { a: "", b: "" };
+        matchData.isLocked = newState; // تحديث حالة القفل في السحابة
+        
+        db.collection("worldcup2026").doc("real_results").set({
+            [matchId]: matchData
+        }, { merge: true }).then(() => {
+            loadData(); // إعادة تحميل الواجهة لتحديث الزر
+        }).catch(err => {
+            console.error(err);
+            alert("❌ حدث خطأ أثناء محاولة تعديل قفل المباراة.");
+        });
     });
-}
-
-function updateLockUI() {
-    const banner = document.getElementById("global-lock-banner");
-    const saveBtn = document.getElementById("save-btn");
-    const adminStatus = document.getElementById("admin-lock-status");
-    const adminBtn = document.getElementById("admin-lock-toggle-btn");
-
-    // تحكم اللاعبين: إظهار البنر وإخفاء زر الحفظ إذا كان الموقع مقفولاً
-    if (globalIsLocked && currentMode !== 'real') {
-        if (banner) banner.style.display = "block";
-        if (saveBtn) saveBtn.style.display = "none";
-    } else {
-        if (banner) banner.style.display = "none";
-        if (saveBtn) saveBtn.style.display = "block";
-    }
-
-    // تحديث أزرار لوحة الأدمن فقط إذا كنا في وضع المالك
-    if (currentMode === 'real') {
-        if (globalIsLocked) {
-            if (adminStatus) adminStatus.innerHTML = `حالة النظام حالياً: <span style="color:var(--danger)">🔒 مغلق تماماً على اللاعبين</span>`;
-            if (adminBtn) {
-                adminBtn.textContent = "🔓 إلغاء قفل التوقعات (فتح للجميع)";
-                adminBtn.style.backgroundColor = "var(--success)";
-            }
-        } else {
-            if (adminStatus) adminStatus.innerHTML = `حالة النظام حالياً: <span style="color:var(--success)">🔓 مفتوح ومتاح للجميع</span>`;
-            if (adminBtn) {
-                adminBtn.textContent = "🔒 قفل التوقعات فوراً على الجميع";
-                adminBtn.style.backgroundColor = "var(--danger)";
-            }
-        }
-    }
 }
 
 // =================================================================
@@ -306,7 +278,7 @@ function logoutUser() {
     document.getElementById("login-screen").style.display = "flex";
 }
 
-// تعديل وضع الشاشة لعرض/إخفاء لوحة الإدارة المتكاملة
+// تعديل وضع الشاشة לעرض/إخفاء لوحة الإدارة للمالك
 function setMode(mode) {
     const adminPanel = document.getElementById('admin-panel');
     
@@ -327,7 +299,7 @@ function setMode(mode) {
     document.getElementById(`btn-${mode}-mode`).classList.add('active');
 
     const saveBtn = document.getElementById('save-btn');
-    if (saveBtn) saveBtn.textContent = mode === 'real' ? "💾 حفظ النتائج الحقيقية" : "حفظ وقفل التوقعات 💾";
+    if (saveBtn) saveBtn.textContent = mode === 'real' ? "💾 حفظ النتائج الحقيقية" : "حفظ التوقعات 💾";
     loadData();
 }
 
@@ -335,30 +307,22 @@ function loadData() {
     if (!groupsData[currentGroup]) return;
     if (!firebaseReady) return;
 
-    // جلب مستند القفل العام أولاً
-    db.collection("settings").doc("global").get().then(settingsDoc => {
-        globalIsLocked = settingsDoc.exists ? !!settingsDoc.data().isLocked : false;
-        updateLockUI();
+    db.collection("worldcup2026").doc("real_results").get().then(realDoc => {
+        let realResults = realDoc.exists ? realDoc.data() : {};
+        db.collection("worldcup2026").doc(`predict_${currentUser}`).get().then(userDoc => {
+            let userPredictions = userDoc.exists ? userDoc.data() : {};
 
-        db.collection("worldcup2026").doc("real_results").get().then(realDoc => {
-            let realResults = realDoc.exists ? realDoc.data() : {};
-            db.collection("worldcup2026").doc(`predict_${currentUser}`).get().then(userDoc => {
-                let userPredictions = userDoc.exists ? userDoc.data() : {};
-
-                autoFillMissedPredictions(currentGroup, realResults, userPredictions).then(updatedPredictions => {
-                    renderMatchesLayout(realResults, updatedPredictions);
-                    calculateSystem(realResults, updatedPredictions);
-                });
-            }).catch(err => {
-                renderMatchesLayout(realResults, {}); calculateSystem(realResults, {});
+            autoFillMissedPredictions(currentGroup, realResults, userPredictions).then(updatedPredictions => {
+                renderMatchesLayout(realResults, updatedPredictions);
+                calculateSystem(realResults, updatedPredictions);
             });
         }).catch(err => {
-            renderMatchesLayout({}, {}); calculateSystem({}, {});
+            renderMatchesLayout(realResults, {}); calculateSystem(realResults, {});
         });
     }).catch(err => {
-        console.error("خطأ أثناء جلب القفل العام:", err);
-        updateLockUI();
+        renderMatchesLayout({}, {}); calculateSystem({}, {});
     });
+    
     updateLeaderboard();
 }
 
@@ -399,26 +363,46 @@ function handleJokerChange(matchId) {
     }
 }
 
+// عرض واجهة المباريات (مدمج بها نظام القفل الفردي الجديد)
 function renderMatchesLayout(realResults, userPredictions) {
     const container = document.getElementById('matches-list');
     if (!container) return;
     container.innerHTML = "";
 
-    groupsData[currentGroup].matches.forEach(m => {
-        let isRealExist = (realResults[m.id] && realResults[m.id].a !== undefined && realResults[m.id].a !== "");
-        let saved = currentMode === 'real' ? (realResults[m.id] || { a: "", b: "", isJoker: false }) : (userPredictions[m.id] || { a: "", b: "", isJoker: false });
+    let hasOpenMatchesForUser = false; // لاكتشاف ما إذا كانت كل المباريات مغلقة لإخفاء زر الحفظ
 
-        // القفل ينشط إذا وُجدت نتيجة حقيقية أو إذا فعّل المسؤول القفل العام (باستثناء وضع المالك)
-        let isLockedByAdmin = globalIsLocked && currentMode !== 'real';
-        let isDisabled = (isRealExist || isLockedByAdmin) ? "disabled" : "";
-        
+    groupsData[currentGroup].matches.forEach(m => {
+        let realMatchData = realResults[m.id] || { a: "", b: "" };
+        let saved = currentMode === 'real' ? realMatchData : (userPredictions[m.id] || { a: "", b: "", isJoker: false });
+
+        let isRealExist = (realMatchData.a !== undefined && realMatchData.a !== "");
+        let isManualLocked = realMatchData.isLocked === true; // قراءة القفل الفردي من قاعدة البيانات للمباراة
+
+        // في وضع اللاعب: تقفل المباراة إذا سجلت نتيجتها النهائية أو إذا قفلها المسؤول يدوياً
+        let isDisabled = "";
+        if (currentMode === 'predict') {
+            if (isRealExist || isManualLocked) isDisabled = "disabled";
+            else hasOpenMatchesForUser = true;
+        }
+
         let lockNote = "";
-        if (isRealExist) {
-            lockNote = currentMode === 'real'
-                ? `<span class="match-locked-note">🔒 النتيجة محفوظة بشكل نهائي</span>`
-                : `<span class="match-locked-note">🔒 انتهت المباراة - التوقع مقفل</span>`;
-        } else if (isLockedByAdmin) {
-            lockNote = `<span class="match-locked-note" style="color:var(--danger);font-weight:bold;">🔒 مقفلة بقرار المسؤول</span>`;
+        let adminLockBtn = "";
+
+        // عرض رسائل القفل المناسبة للمستخدم وزر القفل للمسؤول
+        if (currentMode === 'real') {
+            if (isRealExist) {
+                lockNote = `<span class="match-locked-note" style="color:var(--text-muted);">🔒 النتيجة محفوظة</span>`;
+            }
+            // زر المالك لقفل/فتح المباراة يدوياً
+            let lockText = isManualLocked ? "🔓 المباراة مقفلة - افتحها الآن" : "🔒 المباراة مفتوحة - اقفلها الآن";
+            let lockClass = isManualLocked ? "locked" : "unlocked";
+            adminLockBtn = `<button class="admin-lock-btn ${lockClass}" onclick="toggleMatchLock('${m.id}', ${isManualLocked})">${lockText}</button>`;
+        } else {
+            if (isRealExist) {
+                lockNote = `<span class="match-locked-note">🔒 انتهت المباراة - التوقع مقفل</span>`;
+            } else if (isManualLocked) {
+                lockNote = `<span class="match-locked-note" style="color:var(--danger);font-weight:bold;">🔒 مغلقة (حان وقت البداية)</span>`;
+            }
         }
 
         let isJokerChecked = saved.isJoker ? "checked" : "";
@@ -439,11 +423,22 @@ function renderMatchesLayout(realResults, userPredictions) {
                         <input type="number" min="0" step="1" ${isDisabled} class="score-input" id="inputB-${m.id}" value="${saved.b !== undefined ? saved.b : ''}">
                     </div>
                     ${lockNote}
+                    ${adminLockBtn}
                 </div>
                 <span class="team-name">${escapeHtml(m.tB)}</span>
             </div>
         `;
     });
+
+    // إخفاء زر حفظ التوقعات للاعبين إذا كانت جميع المباريات في هذه المجموعة مقفلة
+    const saveBtn = document.getElementById('save-btn');
+    if (saveBtn) {
+        if (currentMode === 'predict' && !hasOpenMatchesForUser) {
+            saveBtn.style.display = "none";
+        } else {
+            saveBtn.style.display = "block";
+        }
+    }
 }
 
 function escapeHtml(str) {
@@ -510,11 +505,6 @@ function computeGroupBonus(groupKey, realResults, userPredictions) {
 
 function saveDataToCloud() {
     if (!firebaseReady) return alert("⚠️ لم يتم ضبط Firebase.");
-    
-    // منع الحفظ إذا كان القفل العام مفعلاً والمستخدم ليس المالك
-    if (globalIsLocked && currentMode !== 'real') {
-        return alert("⚠️ التوقعات مغلقة حالياً من قبل المسؤول، لا يمكن إرسالها.");
-    }
 
     db.collection("worldcup2026").doc("real_results").get().then(realDoc => {
         let latestRealResults = realDoc.exists ? realDoc.data() : {};
@@ -529,11 +519,13 @@ function saveDataToCloud() {
             if (!inputA || !inputB) return;
 
             const realM = latestRealResults[m.id];
-            const isLocked = realM && isValidScore(realM.a) && isValidScore(realM.b);
+            const isRealExist = realM && isValidScore(realM.a) && isValidScore(realM.b);
+            const isManualLocked = realM && realM.isLocked === true;
 
-            if (isLocked) {
+            // منع المستخدم من حفظ المباريات المقفلة الفردية
+            if (currentMode === 'predict' && (isRealExist || isManualLocked)) {
                 blockedLockedMatch = true;
-                return; 
+                return; // نتخطى هذه المباراة ولا نرسلها للسحابة
             }
 
             const valA = inputA.value.trim();
@@ -544,7 +536,9 @@ function saveDataToCloud() {
             inputB.classList.remove('invalid');
 
             if (valA === "" && valB === "") {
-                dataToSave[m.id] = { a: "", b: "", isJoker: isJokerActive };
+                // للحفاظ على حالة القفل إن وجدت عندما يكون المالك هو من يحفظ
+                let saveObj = currentMode === 'real' ? { a: "", b: "", isLocked: isManualLocked } : { a: "", b: "", isJoker: isJokerActive };
+                dataToSave[m.id] = saveObj;
                 return;
             }
 
@@ -555,7 +549,8 @@ function saveDataToCloud() {
                 return;
             }
 
-            dataToSave[m.id] = { a: valA, b: valB, isJoker: isJokerActive };
+            let saveObj = currentMode === 'real' ? { a: valA, b: valB, isLocked: isManualLocked } : { a: valA, b: valB, isJoker: isJokerActive };
+            dataToSave[m.id] = saveObj;
         });
 
         if (hasInvalid) return alert("⚠️ تحقق من النتائج: يجب إدخال أعداد صحيحة غير سالبة.");
@@ -563,7 +558,7 @@ function saveDataToCloud() {
         let docName = currentMode === 'real' ? "real_results" : `predict_${currentUser}`;
         db.collection("worldcup2026").doc(docName).set(dataToSave, { merge: true }).then(() => {
             if (blockedLockedMatch) alert("💾 تم الحفظ. ملاحظة: بعض المباريات كانت مقفلة بالفعل فلم يتم تعديلها.");
-            else alert("💾 تم حفظ وإرسال البيانات بنجاح!");
+            else alert("💾 تم حفظ البيانات بنجاح!");
             loadData();
         }).catch(err => {
             console.error(err); alert("❌ حدث خطأ أثناء الحفظ.");
