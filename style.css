@@ -19,15 +19,6 @@ header h1 { color: var(--accent-gold); margin-bottom: 5px; }
 .logout-btn:hover { background-color: var(--danger); }
 @media (max-width: 600px) { .logout-btn { position: static; transform: none; margin-top: 10px; } .header-top { flex-direction: column; } }
 
-/* بنر القفل العام للمستخدمين */
-.lock-banner { background-color: var(--danger); color: white; text-align: center; padding: 12px; font-weight: bold; font-size: 1.1rem; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(231, 76, 60, 0.4); }
-
-/* صندوق تحكم المسؤول */
-.admin-lock-box { border: 2px solid var(--danger) !important; padding: 15px; border-radius: 12px; }
-.admin-lock-box h3 { color: var(--danger); margin-bottom: 8px; }
-.admin-lock-box p { font-weight: bold; margin-bottom: 12px; font-size: 1.05rem; }
-.admin-lock-box button { padding: 8px 20px; font-weight: bold; border-radius: 6px; border: none; cursor: pointer; color: white; transition: background 0.2s; }
-
 /* مرحلة خروج المغلوب */
 .knockout-placeholder { text-align: center; padding: 60px 20px; }
 .knockout-icon { font-size: 3.5rem; margin-bottom: 15px; opacity: 0.5; }
@@ -62,13 +53,18 @@ header h1 { color: var(--accent-gold); margin-bottom: 5px; }
 .mode-btn.active { border: 2px solid var(--accent-gold); color: var(--accent-gold); background-color: #152e1b; }
 
 /* مربعات المباريات والجوكر */
-.match-box { display: grid; grid-template-columns: auto 1fr auto 1fr; align-items: center; background-color: #112415; padding: 12px; border-radius: 8px; margin-bottom: 10px; text-align: center; border-right: 4px solid var(--accent-gold); gap: 10px; }
+.match-box { display: grid; grid-template-columns: auto 1fr auto 1fr; align-items: center; background-color: #112415; padding: 12px; border-radius: 8px; margin-bottom: 10px; text-align: center; border-right: 4px solid var(--accent-gold); gap: 10px; position: relative; }
 .match-box .team-name { overflow-wrap: break-word; word-break: break-word; font-size: 0.95rem; }
-.match-locked-note { display: block; font-size: 0.7rem; color: var(--text-muted); margin-top: 4px; }
+.match-locked-note { display: block; font-size: 0.75rem; color: var(--danger); margin-top: 6px; font-weight: bold;}
 .vs-inputs { display: flex; align-items: center; gap: 6px; justify-content: center; }
 .score-input { width: 45px; padding: 5px; background-color: #060c07; border: 1px solid var(--accent-gold); border-radius: 5px; color: white; text-align: center; font-size: 1.1rem; font-weight: bold; }
 .score-input:disabled { background-color: #1a1a1a; border-color: #444; color: #888; cursor: not-allowed; }
 .score-input.invalid { border-color: var(--danger); }
+
+/* أزرار قفل المباراة للمسؤول */
+.admin-lock-btn { margin-top: 8px; padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; cursor: pointer; border: none; transition: 0.2s; }
+.admin-lock-btn.locked { background-color: var(--success); color: white; }
+.admin-lock-btn.unlocked { background-color: var(--danger); color: white; }
 
 /* عنصر اختيار الجوكر */
 .joker-container { display: flex; align-items: center; justify-content: center; padding-left: 5px; border-left: 1px solid #1c3d24; }
