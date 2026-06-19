@@ -46,10 +46,6 @@
         <p id="welcome-msg">مرحباً بك!</p>
     </header>
 
-    <div id="global-lock-banner" class="lock-banner" style="display: none; background-color: var(--danger); color: white; text-align: center; padding: 12px; font-weight: bold; font-size: 1.1rem; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(231, 76, 60, 0.4);">
-        ⚠️ تم إغلاق استقبال التوقعات حالياً من قبل المسؤول (Predictions are locked by Admin)
-    </div>
-
     <div class="groups-tabs-container">
         <ul class="groups-tabs" id="groups-nav"></ul>
     </div>
@@ -70,13 +66,6 @@
             <h2 id="current-group-title">⚽ مباريات المجموعة</h2>
 
             <div id="admin-panel" style="display:none; margin-bottom: 25px; padding: 15px; border: 1px dashed var(--danger); border-radius: 8px; background-color: #1a0a0a;">
-                
-                <div style="margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px solid #333;">
-                    <h3 style="color: var(--danger); margin-bottom: 10px;">🔒 التحكم العام: قفل/فتح التوقعات</h3>
-                    <p id="admin-lock-status" style="font-size: 0.95rem; color: #ccc; margin-bottom: 10px; font-weight: bold;"></p>
-                    <button id="admin-lock-toggle-btn" class="btn" style="background: var(--danger); color: white; border: none; width: auto; display: inline-block; padding: 8px 15px;" onclick="toggleGlobalLock()">جاري التحميل...</button>
-                </div>
-
                 <div>
                     <h3 style="color: var(--danger); margin-bottom: 10px;">🛠️ تغيير أسماء اللاعبين (المراقبة)</h3>
                     <p style="font-size: 0.85rem; color: #ccc; margin-bottom: 15px;">أدخل المعرف الأصلي (ID) الذي سجّل به اللاعب دخوله، ثم اكتب الاسم الجديد اللائق ليظهر في جدول المتصدرين.</p>
@@ -92,7 +81,7 @@
 
             <div id="groups-view">
                 <div id="matches-list"></div>
-                <button class="btn" id="save-btn" onclick="saveDataToCloud()">حفظ وقفل التوقعات 💾</button>
+                <button class="btn" id="save-btn" onclick="saveDataToCloud()">حفظ التوقعات 💾</button>
 
                 <h2 style="margin-top: 30px;">📊 جدول الترتيب والمقارنة</h2>
                 <div class="stats-badge" id="accuracy-badge">🎯 نقاط تحدي التوقعات في هذه المجموعة: 0 نقطة</div>
