@@ -13,7 +13,7 @@ const firebaseConfig = {
 };
 
 // كلمة مرور المالك لتسجيل النتائج الحقيقية
-const ADMIN_PASSWORD = "2026";
+const ADMIN_PASSWORD = "1010";
 
 let firebaseReady = false;
 let db = null;
