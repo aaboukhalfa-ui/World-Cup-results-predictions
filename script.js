@@ -11,7 +11,7 @@ const firebaseConfig = {
   measurementId: "G-9TVP7VS1N7"
 };
 
-// كلمة مرور المالك لتسجيل النتائج الحقيقية والتحكم بالقفل العام
+// كلمة مرور المالك (2026) للتحكم بالقفل وتغيير الأسماء وتسجيل النتائج
 const ADMIN_PASSWORD = "2026";
 
 let firebaseReady = false;
@@ -30,9 +30,9 @@ let currentUserDisplay = localStorage.getItem("prediction_user_display") || curr
 let currentGroup = 'A';
 let currentMode = 'predict';
 let authMode = 'login'; 
-let globalIsLocked = false; // المتغير المسؤول عن حالة قفل الموقع بالكامل
+let globalIsLocked = false; // التحكم بالقفل اليدوي من قبل الأدمن (بدون وقت)
 
-// قاعدة البيانات الكاملة لجميع المجموعات والـ 72 مباراة لمونديال 2026
+// قاعدة البيانات (تم إزالة توقيت kickoffTime لأنه تم التخلي عن العدادات)
 const groupsData = {
     A: { name: "المجموعة الأولى", teams: ["المكسيك 🇲🇽", "جنوب إفريقيا 🇿🇦", "كوريا الجنوبية 🇰🇷", "جمهورية التشيك 🇨🇿"],
          matches: [{id:"A1",tA:"المكسيك 🇲🇽",tB:"جنوب إفريقيا 🇿🇦"},{id:"A2",tA:"كوريا الجنوبية 🇰🇷",tB:"جمهورية التشيك 🇨🇿"},{id:"A3",tA:"المكسيك 🇲🇽",tB:"كوريا الجنوبية 🇰🇷"},{id:"A4",tA:"جنوب إفريقيا 🇿🇦",tB:"جمهورية التشيك 🇨🇿"},{id:"A5",tA:"المكسيك 🇲🇽",tB:"جمهورية التشيك 🇨🇿"},{id:"A6",tA:"كوريا الجنوبية 🇰🇷",tB:"جنوب إفريقيا 🇿🇦"}] },
@@ -61,7 +61,92 @@ const groupsData = {
 };
 
 // =================================================================
-// تهيئة الصفحة عند التحميل
+// وظيفة الإدارة المسترجعة 100%: تغيير اسم عرض اللاعب (Moderation)
+// =================================================================
+function renameUserByAdmin() {
+    let targetId = document.getElementById("admin-target-id").value.trim().toLowerCase();
+    let newName = document.getElementById("admin-new-name").value.trim();
+
+    if (!targetId || !newName) {
+        alert("⚠️ الرجاء إدخال اسم الحساب الأصلي والاسم اللائق الجديد.");
+        return;
+    }
+
+    db.collection("users_passwords").doc(targetId).get().then(doc => {
+        if (!doc.exists) {
+            alert("❌ لم يتم العثور على حساب بهذا الاسم. (تأكد من كتابة الـ ID بدقة).");
+            return;
+        }
+
+        db.collection("users_passwords").doc(targetId).update({
+            displayName: newName
+        }).then(() => {
+            alert(`✅ تم تغيير الاسم في جدول الترتيب بنجاح إلى: ${newName}`);
+            document.getElementById("admin-target-id").value = "";
+            document.getElementById("admin-new-name").value = "";
+            updateLeaderboard(); 
+        }).catch(err => {
+            console.error(err);
+            alert("❌ حدث خطأ أثناء التحديث.");
+        });
+    }).catch(err => {
+        console.error(err);
+        alert("❌ تعذر الاتصال بقاعدة البيانات.");
+    });
+}
+
+// =================================================================
+// وظيفة الإدارة الجديدة: قفل أو فتح التوقعات عالمياً بضغطة زر
+// =================================================================
+function toggleGlobalLock() {
+    if (!firebaseReady) return;
+    let targetState = !globalIsLocked;
+    
+    db.collection("settings").doc("global").set({ isLocked: targetState }, { merge: true }).then(() => {
+        globalIsLocked = targetState;
+        alert(targetState ? "🔒 تم قفل جميع التوقعات بنجاح!" : "🔓 تم فتح باب التوقعات لجميع اللاعبين!");
+        loadData();
+    }).catch(err => {
+        console.error(err);
+        alert("❌ فشل تحديث حالة القفل في السحابة.");
+    });
+}
+
+function updateLockUI() {
+    const banner = document.getElementById("global-lock-banner");
+    const saveBtn = document.getElementById("save-btn");
+    const adminStatus = document.getElementById("admin-lock-status");
+    const adminBtn = document.getElementById("admin-lock-toggle-btn");
+
+    // تحكم اللاعبين: إظهار البنر وإخفاء زر الحفظ إذا كان الموقع مقفولاً
+    if (globalIsLocked && currentMode !== 'real') {
+        if (banner) banner.style.display = "block";
+        if (saveBtn) saveBtn.style.display = "none";
+    } else {
+        if (banner) banner.style.display = "none";
+        if (saveBtn) saveBtn.style.display = "block";
+    }
+
+    // تحديث أزرار لوحة الأدمن فقط إذا كنا في وضع المالك
+    if (currentMode === 'real') {
+        if (globalIsLocked) {
+            if (adminStatus) adminStatus.innerHTML = `حالة النظام حالياً: <span style="color:var(--danger)">🔒 مغلق تماماً على اللاعبين</span>`;
+            if (adminBtn) {
+                adminBtn.textContent = "🔓 إلغاء قفل التوقعات (فتح للجميع)";
+                adminBtn.style.backgroundColor = "var(--success)";
+            }
+        } else {
+            if (adminStatus) adminStatus.innerHTML = `حالة النظام حالياً: <span style="color:var(--success)">🔓 مفتوح ومتاح للجميع</span>`;
+            if (adminBtn) {
+                adminBtn.textContent = "🔒 قفل التوقعات فوراً على الجميع";
+                adminBtn.style.backgroundColor = "var(--danger)";
+            }
+        }
+    }
+}
+
+// =================================================================
+// تهيئة وتشغيل الصفحة
 // =================================================================
 document.addEventListener("DOMContentLoaded", () => {
     const nav = document.getElementById('groups-nav');
@@ -83,11 +168,8 @@ document.addEventListener("DOMContentLoaded", () => {
         nav.appendChild(knockoutTab);
     }
 
-    if (currentUser) {
-        showApp();
-    } else {
-        document.getElementById("login-screen").style.display = "flex";
-    }
+    if (currentUser) showApp();
+    else document.getElementById("login-screen").style.display = "flex";
 
     const pwInput = document.getElementById("password-input");
     if (pwInput) {
@@ -136,7 +218,6 @@ function setLoginError(msg) {
 function setAuthMode(mode) {
     authMode = mode;
     setLoginError("");
-
     document.getElementById("auth-tab-login").classList.toggle("active", mode === "login");
     document.getElementById("auth-tab-signup").classList.toggle("active", mode === "signup");
 
@@ -154,7 +235,7 @@ function setAuthMode(mode) {
 
 function loginUser() {
     if (!firebaseReady) {
-        setLoginError("⚠️ لم يتم ضبط Firebase بعد. أضف بيانات المشروع في script.js");
+        setLoginError("⚠️ لم يتم ضبط Firebase بعد.");
         return;
     }
 
@@ -162,18 +243,9 @@ function loginUser() {
     let pass = document.getElementById("password-input").value.trim();
     setLoginError("");
 
-    if (rawName === "" || pass === "") {
-        setLoginError("الرجاء كتابة الاسم وكلمة السر معاً!");
-        return;
-    }
-    if (rawName.length > 30) {
-        setLoginError("الاسم طويل جداً (30 حرف كحد أقصى).");
-        return;
-    }
-    if (/[\/\.\#\$\[\]]/.test(rawName)) {
-        setLoginError("الاسم يحتوي على رموز غير مسموحة (مثل / . # $ [ ]).");
-        return;
-    }
+    if (rawName === "" || pass === "") return setLoginError("الرجاء كتابة الاسم وكلمة السر معاً!");
+    if (rawName.length > 30) return setLoginError("الاسم طويل جداً (30 حرف كحد أقصى).");
+    if (/[\/\.\#\$\[\]]/.test(rawName)) return setLoginError("الاسم يحتوي على رموز غير مسموحة.");
 
     let name = rawName.toLowerCase();
     const loginBtn = document.getElementById("login-btn");
@@ -183,39 +255,29 @@ function loginUser() {
     db.collection("users_passwords").doc(name).get().then(doc => {
         if (doc.exists) {
             if (authMode === 'signup') {
-                setLoginError("⚠️ هذا الاسم مستخدم بالفعل! إذا كان حسابك، اضغط على «حساب موجود» وادخل كلمة سرك.");
-                loginBtn.disabled = false;
-                loginBtn.textContent = "إنشاء الحساب ✨";
-                return;
+                setLoginError("⚠️ هذا الاسم مستخدم بالفعل! اضغط على «حساب موجود».");
+                loginBtn.disabled = false; loginBtn.textContent = "إنشاء الحساب ✨"; return;
             }
-            if (doc.data().password === pass) {
-                successLogin(name, doc.data().displayName || rawName);
-            } else {
-                setLoginError("❌ كلمة السر غير صحيحة لهذا الحساب!");
-                loginBtn.disabled = false;
-                loginBtn.textContent = "دخول 🚀";
+            if (doc.data().password === pass) successLogin(name, doc.data().displayName || rawName);
+            else {
+                setLoginError("❌ كلمة السر غير صحيحة!");
+                loginBtn.disabled = false; loginBtn.textContent = "دخول 🚀";
             }
         } else {
             if (authMode === 'login') {
-                setLoginError("⚠️ لا يوجد حساب بهذا الاسم. إذا كانت هذه أول مرة، اضغط على «حساب جديد».");
-                loginBtn.disabled = false;
-                loginBtn.textContent = "دخول 🚀";
-                return;
+                setLoginError("⚠️ لا يوجد حساب بهذا الاسم. اضغط على «حساب جديد».");
+                loginBtn.disabled = false; loginBtn.textContent = "دخول 🚀"; return;
             }
             db.collection("users_passwords").doc(name).set({ password: pass, displayName: rawName, previousPosition: "" }).then(() => {
                 successLogin(name, rawName);
             }).catch(err => {
-                console.error(err);
-                setLoginError("❌ تعذر إنشاء الحساب. حاول مجدداً.");
-                loginBtn.disabled = false;
-                loginBtn.textContent = "إنشاء الحساب ✨";
+                setLoginError("❌ تعذر إنشاء الحساب.");
+                loginBtn.disabled = false; loginBtn.textContent = "إنشاء الحساب ✨";
             });
         }
     }).catch(err => {
-        console.error(err);
-        setLoginError("❌ تعذر الاتصال بقاعدة البيانات. تحقق من اتصالك بالإنترنت.");
-        loginBtn.disabled = false;
-        loginBtn.textContent = authMode === 'login' ? "دخول 🚀" : "إنشاء الحساب ✨";
+        setLoginError("❌ تعذر الاتصال بالشبكة.");
+        loginBtn.disabled = false; loginBtn.textContent = authMode === 'login' ? "دخول 🚀" : "إنشاء الحساب ✨";
     });
 }
 
@@ -230,9 +292,7 @@ function successLogin(name, displayName) {
 function logoutUser() {
     localStorage.removeItem("prediction_user");
     localStorage.removeItem("prediction_user_display");
-    currentUser = "";
-    currentUserDisplay = "";
-    currentMode = 'predict';
+    currentUser = ""; currentUserDisplay = ""; currentMode = 'predict';
 
     document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('btn-predict-mode').classList.add('active');
@@ -246,90 +306,36 @@ function logoutUser() {
     document.getElementById("login-screen").style.display = "flex";
 }
 
+// تعديل وضع الشاشة لعرض/إخفاء لوحة الإدارة المتكاملة
 function setMode(mode) {
+    const adminPanel = document.getElementById('admin-panel');
+    
     if (mode === 'real') {
-        let password = prompt("أدخل رمز المالك لتسجيل النتائج الحقيقية:");
+        let password = prompt("أدخل رمز المالك (PIN) لتسجيل النتائج وإدارة اللاعبين:");
         if (password === null) return;
         if (password !== ADMIN_PASSWORD) {
             alert("❌ رمز غير صحيح!");
             return;
         }
+        if (adminPanel) adminPanel.style.display = 'block';
+    } else {
+        if (adminPanel) adminPanel.style.display = 'none';
     }
+    
     currentMode = mode;
     document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
     document.getElementById(`btn-${mode}-mode`).classList.add('active');
 
     const saveBtn = document.getElementById('save-btn');
-    if (saveBtn) {
-        saveBtn.textContent = mode === 'real' ? "💾 حفظ النتائج الحقيقية" : "حفظ وقفل التوقعات 💾";
-    }
+    if (saveBtn) saveBtn.textContent = mode === 'real' ? "💾 حفظ النتائج الحقيقية" : "حفظ وقفل التوقعات 💾";
     loadData();
-}
-
-// تحديث واجهات وأدوات القفل العام
-function updateLockUI() {
-    const banner = document.getElementById("global-lock-banner");
-    const saveBtn = document.getElementById("save-btn");
-    const adminBox = document.getElementById("admin-lock-control");
-    const adminStatus = document.getElementById("admin-lock-status");
-    const adminBtn = document.getElementById("admin-lock-toggle-btn");
-
-    // تحكم البنر الخاص باللاعبين وزر الحفظ
-    if (globalIsLocked && currentMode !== 'real') {
-        if (banner) banner.style.display = "block";
-        if (saveBtn) saveBtn.style.display = "none";
-    } else {
-        if (banner) banner.style.display = "none";
-        if (saveBtn) saveBtn.style.display = "block";
-    }
-
-    // تحكم لوحة تحكم الأدمن
-    if (adminBox) {
-        if (currentMode === 'real') {
-            adminBox.style.display = "block";
-            if (globalIsLocked) {
-                if (adminStatus) adminStatus.innerHTML = `حالة القفل الحالي: <span style="color:var(--danger)">🔒 مغلق لجميع المستخدمين</span>`;
-                if (adminBtn) {
-                    adminBtn.textContent = "🔓 إلغاء قفل التوقعات للجميع";
-                    adminBtn.style.backgroundColor = "var(--success)";
-                }
-            } else {
-                if (adminStatus) adminStatus.innerHTML = `حالة القفل الحالي: <span style="color:var(--success)">🔓 مفتوح ومتاح للاعبين</span>`;
-                if (adminBtn) {
-                    adminBtn.textContent = "🔒 قفل التوقعات فوراً على الجميع";
-                    adminBtn.style.backgroundColor = "var(--danger)";
-                }
-            }
-        } else {
-            adminBox.style.display = "none";
-        }
-    }
-}
-
-// تشغيل وإلغاء القفل العام من قبل الأدمن
-function toggleGlobalLock() {
-    if (!firebaseReady) return;
-    let targetState = !globalIsLocked;
-    
-    db.collection("settings").doc("global").set({ isLocked: targetState }, { merge: true }).then(() => {
-        globalIsLocked = targetState;
-        alert(targetState ? "🔒 تم قفل استقبال التوقعات بالكامل بنجاح!" : "🔓 تم فتح باب التوقعات لجميع المستخدمين!");
-        loadData();
-    }).catch(err => {
-        console.error(err);
-        alert("❌ فشل تحديث حالة القفل في السحابة.");
-    });
 }
 
 function loadData() {
     if (!groupsData[currentGroup]) return;
-    if (!firebaseReady) {
-        renderMatchesLayout({}, {});
-        calculateSystem({}, {});
-        return;
-    }
+    if (!firebaseReady) return;
 
-    // جلب مستند إعدادات القفل العام أولاً
+    // جلب مستند القفل العام أولاً
     db.collection("settings").doc("global").get().then(settingsDoc => {
         globalIsLocked = settingsDoc.exists ? !!settingsDoc.data().isLocked : false;
         updateLockUI();
@@ -344,14 +350,10 @@ function loadData() {
                     calculateSystem(realResults, updatedPredictions);
                 });
             }).catch(err => {
-                console.error(err);
-                renderMatchesLayout(realResults, {});
-                calculateSystem(realResults, {});
+                renderMatchesLayout(realResults, {}); calculateSystem(realResults, {});
             });
         }).catch(err => {
-            console.error(err);
-            renderMatchesLayout({}, {});
-            calculateSystem({}, {});
+            renderMatchesLayout({}, {}); calculateSystem({}, {});
         });
     }).catch(err => {
         console.error("خطأ أثناء جلب القفل العام:", err);
@@ -378,20 +380,13 @@ function autoFillMissedPredictions(groupKey, realResults, userPredictions) {
         changed = true;
     });
 
-    if (!changed || !firebaseReady || !currentUser) {
-        return Promise.resolve(userPredictions);
-    }
+    if (!changed || !firebaseReady || !currentUser) return Promise.resolve(userPredictions);
 
     return db.collection("worldcup2026").doc(`predict_${currentUser}`)
-        .set(toSave, { merge: true })
-        .then(() => userPredictions)
-        .catch(err => {
-            console.error("فشل حفظ التعبئة التلقائية:", err);
-            return userPredictions; 
-        });
+        .set(toSave, { merge: true }).then(() => userPredictions).catch(() => userPredictions);
 }
 
-// قواعد عدم السماح باختيار أكثر من جوكر واحد في المجموعة داخل الواجهة
+// 🃏 خاصية الجوكر: التأكد من اختيار جوكر واحد فقط لكل مجموعة
 function handleJokerChange(matchId) {
     const currentCheckbox = document.getElementById(`joker-${matchId}`);
     if (currentCheckbox && currentCheckbox.checked) {
@@ -413,17 +408,17 @@ function renderMatchesLayout(realResults, userPredictions) {
         let isRealExist = (realResults[m.id] && realResults[m.id].a !== undefined && realResults[m.id].a !== "");
         let saved = currentMode === 'real' ? (realResults[m.id] || { a: "", b: "", isJoker: false }) : (userPredictions[m.id] || { a: "", b: "", isJoker: false });
 
-        // تحديد ما إذا كان يجب تعطيل الحقول (بسبب وجود نتيجة حقيقية أو قفل المسؤول العام)
+        // القفل ينشط إذا وُجدت نتيجة حقيقية أو إذا فعّل المسؤول القفل العام (باستثناء وضع المالك)
         let isLockedByAdmin = globalIsLocked && currentMode !== 'real';
         let isDisabled = (isRealExist || isLockedByAdmin) ? "disabled" : "";
         
         let lockNote = "";
         if (isRealExist) {
             lockNote = currentMode === 'real'
-                ? `<span class="match-locked-note">🔒 النتيجة محفوظة بشكل نهائي - لا يمكن تعديلها</span>`
+                ? `<span class="match-locked-note">🔒 النتيجة محفوظة بشكل نهائي</span>`
                 : `<span class="match-locked-note">🔒 انتهت المباراة - التوقع مقفل</span>`;
         } else if (isLockedByAdmin) {
-            lockNote = `<span class="match-locked-note">🔒 مغلق بقرار من المسؤول</span>`;
+            lockNote = `<span class="match-locked-note" style="color:var(--danger);font-weight:bold;">🔒 مقفلة بقرار المسؤول</span>`;
         }
 
         let isJokerChecked = saved.isJoker ? "checked" : "";
@@ -463,11 +458,10 @@ function isValidScore(value) {
     return true;
 }
 
-// حساب النقاط بناءً على الحساب العادي وحالة الجوكر
+// احتساب النقاط وتفعيل ميزة ضعف النقاط للجوكر
 function pointsForPrediction(pa, pb, ra, rb, isAuto, isJoker) {
     if (isAuto) return 0;
     let scorePoints = 0;
-    
     if (pa === ra && pb === rb) {
         scorePoints = 3;
     } else {
@@ -475,7 +469,6 @@ function pointsForPrediction(pa, pb, ra, rb, isAuto, isJoker) {
         const realOutcome = ra > rb ? 'A' : (rb > ra ? 'B' : 'D');
         scorePoints = (predictedOutcome === realOutcome) ? 1 : 0;
     }
-    
     return isJoker ? (scorePoints * 2) : scorePoints;
 }
 
@@ -509,27 +502,22 @@ function computeGroupOrder(groupKey, resultsObj) {
 function computeGroupBonus(groupKey, realResults, userPredictions) {
     const real = computeGroupOrder(groupKey, realResults);
     if (!real.isComplete || real.hasTie) return 0;
-
     const predicted = computeGroupOrder(groupKey, userPredictions);
     if (predicted.hasTie) return 0;
-
     const exactMatch = real.order.every((team, i) => team === predicted.order[i]);
     return exactMatch ? 3 : 0;
 }
 
 function saveDataToCloud() {
-    if (!firebaseReady) {
-        alert("⚠️ لم يتم ضبط Firebase. لا يمكن الحفظ الآن.");
-        return;
-    }
+    if (!firebaseReady) return alert("⚠️ لم يتم ضبط Firebase.");
+    
+    // منع الحفظ إذا كان القفل العام مفعلاً والمستخدم ليس المالك
     if (globalIsLocked && currentMode !== 'real') {
-        alert("⚠️ التوقعات مغلقة حالياً من قبل المسؤول، لا يمكن إرسالها.");
-        return;
+        return alert("⚠️ التوقعات مغلقة حالياً من قبل المسؤول، لا يمكن إرسالها.");
     }
 
     db.collection("worldcup2026").doc("real_results").get().then(realDoc => {
         let latestRealResults = realDoc.exists ? realDoc.data() : {};
-
         let dataToSave = {};
         let hasInvalid = false;
         let blockedLockedMatch = false;
@@ -550,11 +538,10 @@ function saveDataToCloud() {
 
             const valA = inputA.value.trim();
             const valB = inputB.value.trim();
+            let isJokerActive = jokerChk ? jokerChk.checked : false;
 
             inputA.classList.remove('invalid');
             inputB.classList.remove('invalid');
-
-            let isJokerActive = jokerChk ? jokerChk.checked : false;
 
             if (valA === "" && valB === "") {
                 dataToSave[m.id] = { a: "", b: "", isJoker: isJokerActive };
@@ -571,26 +558,16 @@ function saveDataToCloud() {
             dataToSave[m.id] = { a: valA, b: valB, isJoker: isJokerActive };
         });
 
-        if (hasInvalid) {
-            alert("⚠️ تحقق من النتائج: يجب إدخال أعداد صحيحة غير سالبة لكل مباراة.");
-            return;
-        }
+        if (hasInvalid) return alert("⚠️ تحقق من النتائج: يجب إدخال أعداد صحيحة غير سالبة.");
 
         let docName = currentMode === 'real' ? "real_results" : `predict_${currentUser}`;
         db.collection("worldcup2026").doc(docName).set(dataToSave, { merge: true }).then(() => {
-            if (blockedLockedMatch) {
-                alert("💾 تم الحفظ. ملاحظة: بعض المباريات كانت مقفلة بالفعل فلم يتم تعديلها.");
-            } else {
-                alert("💾 تم حفظ وإرسال البيانات بنجاح!");
-            }
+            if (blockedLockedMatch) alert("💾 تم الحفظ. ملاحظة: بعض المباريات كانت مقفلة بالفعل فلم يتم تعديلها.");
+            else alert("💾 تم حفظ وإرسال البيانات بنجاح!");
             loadData();
         }).catch(err => {
-            console.error(err);
-            alert("❌ حدث خطأ أثناء الحفظ.");
+            console.error(err); alert("❌ حدث خطأ أثناء الحفظ.");
         });
-    }).catch(err => {
-        console.error(err);
-        alert("❌ تعذر التحقق من حالة المباريات.");
     });
 }
 
@@ -634,22 +611,15 @@ function calculateSystem(realResults, userPredictions) {
     challengePoints += groupBonus;
 
     const badge = document.getElementById('accuracy-badge');
-    if (badge) {
-        badge.textContent = currentMode === 'real'
-            ? `👑 أنت في وضع إدخال النتائج الحقيقية لمجموعة ${currentGroup}`
-            : `🎯 نقاط تحدي التوقعات الخاصة بك في هذه المجموعة: ${challengePoints} نقطة`;
-    }
+    if (badge) badge.textContent = currentMode === 'real' ? `👑 أنت في وضع إدخال النتائج الحقيقية لمجموعة ${currentGroup}` : `🎯 نقاط تحدي التوقعات الخاصة بك: ${challengePoints} نقطة`;
 
     const bonusBadge = document.getElementById('group-bonus-badge');
     if (bonusBadge) {
-        if (currentMode === 'real') {
-            bonusBadge.style.display = "none";
-        } else if (groupBonus > 0) {
+        if (currentMode === 'real') bonusBadge.style.display = "none";
+        else if (groupBonus > 0) {
             bonusBadge.style.display = "block";
             bonusBadge.textContent = `🏆 مبروك! توقعت ترتيب هذه المجموعة بالكامل بشكل صحيح: +3 نقاط`;
-        } else {
-            bonusBadge.style.display = "none";
-        }
+        } else bonusBadge.style.display = "none";
     }
 
     let sorted = Object.values(teamStats).sort((a, b) => b.rPoints - a.rPoints || b.pPoints - a.pPoints);
@@ -670,11 +640,7 @@ function calculateSystem(realResults, userPredictions) {
 
 const ADMIN_USERNAME = "boukhalfa anes";
 
-const matchIdToGroup = {};
-Object.keys(groupsData).forEach(g => {
-    groupsData[g].matches.forEach(m => { matchIdToGroup[m.id] = g; });
-});
-
+// جلب الترتيب مع الأسهم المؤشرة
 function updateLeaderboard() {
     if (!firebaseReady) return;
 
@@ -686,7 +652,6 @@ function updateLeaderboard() {
             querySnapshot.forEach(doc => {
                 if (doc.id.startsWith("predict_")) {
                     let user = doc.id.replace("predict_", "");
-
                     if (user.toLowerCase() === ADMIN_USERNAME) return;
 
                     let userPreds = doc.data();
@@ -713,10 +678,7 @@ function updateLeaderboard() {
                 }
             });
 
-            if (scores.length === 0) {
-                renderLeaderboard([]);
-                return;
-            }
+            if (scores.length === 0) return renderLeaderboard([]);
 
             Promise.all(
                 scores.map(s =>
@@ -739,8 +701,8 @@ function renderLeaderboard(scores) {
     if (!listContainer) return;
 
     const filteredScores = scores.filter(s => (s.name || "").trim().toLowerCase() !== ADMIN_USERNAME);
-
     listContainer.innerHTML = "";
+    
     if (filteredScores.length === 0) {
         listContainer.innerHTML = `<li class="empty-msg">لا يوجد متسابقون بعد</li>`;
     } else {
@@ -751,13 +713,8 @@ function renderLeaderboard(scores) {
 
             if (s.previousPosition !== undefined && s.previousPosition !== null && s.previousPosition !== "") {
                 let prev = parseInt(s.previousPosition, 10);
-                if (currentRank < prev) {
-                    arrow = "▲";
-                    arrowClass = "trend-up";
-                } else if (currentRank > prev) {
-                    arrow = "▼";
-                    arrowClass = "trend-down";
-                }
+                if (currentRank < prev) { arrow = "▲"; arrowClass = "trend-up"; } 
+                else if (currentRank > prev) { arrow = "▼"; arrowClass = "trend-down"; }
             }
 
             listContainer.innerHTML += `<li>
