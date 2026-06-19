@@ -12,8 +12,8 @@ const firebaseConfig = {
   measurementId: "G-9TVP7VS1N7"
 };
 
-// كلمة مرور المالك لتسجيل النتائج الحقيقية
-const ADMIN_PASSWORD = "1010";
+// كلمة مرور المالك لتسجيل النتائج الحقيقية وإدارة المنصة
+const ADMIN_PASSWORD = "2026";
 
 let firebaseReady = false;
 let db = null;
@@ -24,6 +24,41 @@ try {
     firebaseReady = true;
 } catch (e) {
     console.error("فشل الاتصال بـ Firebase. تأكد من ضبط firebaseConfig بشكل صحيح.", e);
+}
+
+// =================================================================
+// وظيفة الإدارة: تغيير اسم عرض اللاعب (Moderation)
+// =================================================================
+function renameUserByAdmin() {
+    let targetId = document.getElementById("admin-target-id").value.trim().toLowerCase();
+    let newName = document.getElementById("admin-new-name").value.trim();
+
+    if (!targetId || !newName) {
+        alert("⚠️ الرجاء إدخال اسم الحساب الأصلي والاسم اللائق الجديد.");
+        return;
+    }
+
+    db.collection("users_passwords").doc(targetId).get().then(doc => {
+        if (!doc.exists) {
+            alert("❌ لم يتم العثور على حساب بهذا الاسم. (تأكد من كتابة الـ ID/اسم الدخول الأصلي بدقة).");
+            return;
+        }
+
+        db.collection("users_passwords").doc(targetId).update({
+            displayName: newName
+        }).then(() => {
+            alert(`✅ تم تغيير الاسم في جدول الترتيب بنجاح إلى: ${newName}`);
+            document.getElementById("admin-target-id").value = "";
+            document.getElementById("admin-new-name").value = "";
+            updateLeaderboard(); // تحديث الجدول فوراً ليعكس الاسم الجديد
+        }).catch(err => {
+            console.error(err);
+            alert("❌ حدث خطأ أثناء التحديث.");
+        });
+    }).catch(err => {
+        console.error(err);
+        alert("❌ تعذر الاتصال بقاعدة البيانات.");
+    });
 }
 
 let currentUser = localStorage.getItem("prediction_user") || "";
@@ -247,14 +282,20 @@ function logoutUser() {
 }
 
 function setMode(mode) {
+    const adminPanel = document.getElementById('admin-panel');
+    
     if (mode === 'real') {
-        let password = prompt("أدخل رمز المالك لتسجيل النتائج الحقيقية:");
+        let password = prompt("أدخل رمز المالك (PIN) لتسجيل النتائج وإدارة اللاعبين:");
         if (password === null) return;
         if (password !== ADMIN_PASSWORD) {
             alert("❌ رمز غير صحيح!");
             return;
         }
+        if (adminPanel) adminPanel.style.display = 'block';
+    } else {
+        if (adminPanel) adminPanel.style.display = 'none';
     }
+    
     currentMode = mode;
     document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
     document.getElementById(`btn-${mode}-mode`).classList.add('active');
@@ -278,9 +319,6 @@ function loadData() {
             let userPredictions = userDoc.exists ? userDoc.data() : {};
 
             // ✅ تعبئة تلقائية للمباريات المنتهية التي لم يتوقعها المستخدم
-            // (سواء لاعب قديم نسي مباراة، أو لاعب جديد انضم بعد بدء البطولة).
-            // تُحفظ في قاعدة بياناته الخاصة بعلامة auto:true لضمان 0 نقطة دائماً،
-            // وتبقى قابلة للتعديل اليدوي من لوحة Firebase فقط (وليس من الواجهة).
             autoFillMissedPredictions(currentGroup, realResults, userPredictions).then(updatedPredictions => {
                 renderMatchesLayout(realResults, updatedPredictions);
                 calculateSystem(realResults, updatedPredictions);
@@ -298,20 +336,6 @@ function loadData() {
     updateLeaderboard();
 }
 
-// =================================================================
-// تعبئة تلقائية لتوقعات المباريات المنتهية التي تركها المستخدم فارغة.
-//
-// السبب: حتى لا تتعطل واجهة وجدول الترتيب الشخصي للمستخدم (لاعب جديد
-// انضم بعد بدء البطولة، أو لاعب قديم نسي مباراة)، نملأ توقعه بنفس
-// النتيجة الحقيقية تلقائياً. لكن هذا التوقع المُعبَّأ تلقائياً يُعلَّم
-// داخلياً بـ auto:true ولا يُحسب له أي نقاط في نظام التحدي (0 نقطة
-// دائماً)، حتى لو تطابقت الأرقام مع النتيجة الحقيقية بالضرورة.
-//
-// التعديل اليدوي: لو أراد المالك تصحيح توقع لاعب نسي بالخطأ، يمكنه
-// فتح Firebase Console مباشرة، وتعديل الحقل a/b لتلك المباراة في
-// مستند `predict_<username>`، وحذف أو تغيير حقل auto إلى false (أو
-// حذفه بالكامل) ليُحسب التوقع بشكل طبيعي مرة أخرى.
-// =================================================================
 function autoFillMissedPredictions(groupKey, realResults, userPredictions) {
     let toSave = {};
     let changed = false;
@@ -319,13 +343,12 @@ function autoFillMissedPredictions(groupKey, realResults, userPredictions) {
     groupsData[groupKey].matches.forEach(m => {
         const real = realResults[m.id];
         const realIsSet = real && isValidScore(real.a) && isValidScore(real.b);
-        if (!realIsSet) return; // المباراة لم تُلعب بعد، لا تعبئة
+        if (!realIsSet) return; 
 
         const pred = userPredictions[m.id];
         const predIsSet = pred && isValidScore(pred.a) && isValidScore(pred.b);
-        if (predIsSet) return; // المستخدم توقع هذه المباراة فعلاً، لا تغيير
+        if (predIsSet) return; 
 
-        // توقع مفقود لمباراة منتهية -> نعبّئه بالنتيجة الحقيقية، معلّماً بـ auto:true
         userPredictions[m.id] = { a: real.a, b: real.b, auto: true };
         toSave[m.id] = { a: real.a, b: real.b, auto: true };
         changed = true;
@@ -340,7 +363,7 @@ function autoFillMissedPredictions(groupKey, realResults, userPredictions) {
         .then(() => userPredictions)
         .catch(err => {
             console.error("فشل حفظ التعبئة التلقائية:", err);
-            return userPredictions; // نعرضها للمستخدم حتى لو فشل الحفظ، سيُعاد المحاولة لاحقاً
+            return userPredictions;
         });
 }
 
@@ -353,9 +376,6 @@ function renderMatchesLayout(realResults, userPredictions) {
         let isRealExist = (realResults[m.id] && realResults[m.id].a !== undefined && realResults[m.id].a !== "");
         let saved = currentMode === 'real' ? (realResults[m.id] || { a: "", b: "" }) : (userPredictions[m.id] || { a: "", b: "" });
 
-        // ✅ القفل الدائم: بعد إدخال النتيجة الحقيقية لمباراة، تُقفل بشكل
-        // كامل في كل الأوضاع (سواء وضع التوقعات أو وضع إدخال النتائج
-        // الحقيقية). لا يوجد أي زر أو طريقة لإعادة فتحها من الواجهة.
         let isDisabled = isRealExist ? "disabled" : "";
         let lockNote = "";
         if (isRealExist) {
@@ -393,16 +413,6 @@ function isValidScore(value) {
     return true;
 }
 
-// =================================================================
-// نقاط توقع نتيجة مباراة واحدة حسب القاعدة الجديدة:
-// 3 نقاط = نتيجة دقيقة طابقت تماماً
-// 1 نقطة = توقع صحيح للفوز/الخسارة/التعادل لكن الأرقام غير دقيقة
-// 0 نقطة = توقع خاطئ تماماً
-//
-// isAuto: إذا كان التوقع مُعبَّأ تلقائياً (لاعب لم يتوقع المباراة فعلاً
-// وتم نسخ النتيجة الحقيقية له تلقائياً)، يُعطى 0 نقطة دائماً ولا يُحسب
-// كتوقع حقيقي، حتى لو تطابقت الأرقام بالضرورة مع النتيجة الحقيقية.
-// =================================================================
 function pointsForPrediction(pa, pb, ra, rb, isAuto) {
     if (isAuto) return 0;
     if (pa === ra && pb === rb) return 3;
@@ -411,25 +421,13 @@ function pointsForPrediction(pa, pb, ra, rb, isAuto) {
     return predictedOutcome === realOutcome ? 1 : 0;
 }
 
-// =================================================================
-// يحسب ترتيب فرق مجموعة معيّنة (1 إلى 4) بالاستناد إلى نتائج معطاة
-// (سواء كانت نتائج حقيقية أو توقعات مستخدم). يعيد:
-// { order: [اسم الفريق الأول, الثاني, الثالث, الرابع],
-//   isComplete: هل كل المباريات الست (وفقط الست) موجودة فيها نتيجة صحيحة,
-//   hasTie: هل يوجد تعادل بالنقاط بين أي فريقين في الترتيب }
-//
-// ✅ تشديد: matchesWithResult يجب أن يساوي بالضبط عدد مباريات المجموعة
-// (6 مباريات). أي قيمة ناقصة أو غير صالحة (فارغة/null/undefined/غير رقمية)
-// تجعل isComplete = false فوراً، ولا يُحسب أي ترتيب نهائي لهذه الحالة.
-// =================================================================
 function computeGroupOrder(groupKey, resultsObj) {
-    const safeResults = resultsObj || {};
     let stats = {};
     groupsData[groupKey].teams.forEach(t => { stats[t] = { name: t, pts: 0 }; });
 
     let matchesWithResult = 0;
     groupsData[groupKey].matches.forEach(m => {
-        const res = safeResults[m.id];
+        const res = resultsObj[m.id];
         if (res && isValidScore(res.a) && isValidScore(res.b)) {
             matchesWithResult++;
             let a = parseInt(res.a, 10), b = parseInt(res.b, 10);
@@ -439,9 +437,7 @@ function computeGroupOrder(groupKey, resultsObj) {
         }
     });
 
-    const totalMatches = groupsData[groupKey].matches.length; // 6 لكل مجموعة
-    const isComplete = matchesWithResult === totalMatches;
-
+    const isComplete = matchesWithResult === groupsData[groupKey].matches.length;
     const sorted = Object.values(stats).sort((x, y) => y.pts - x.pts);
 
     let hasTie = false;
@@ -456,53 +452,17 @@ function computeGroupOrder(groupKey, resultsObj) {
     };
 }
 
-// =================================================================
-// 🏆 نقاط ترتيب المجموعة (القاعدة الجديدة): 1 نقطة فقط لكل مجموعة
-// متوقَّعة بشكل صحيح 100%، بحد أقصى 12 نقطة (1 × 12 مجموعة).
-//
-// الشروط الصارمة لمنح النقطة (Rule 1 + Rule 2):
-// 1) يجب أن تكون المجموعة الحقيقية مكتملة بالكامل: الست مباريات لها
-//    نتيجة حقيقية صحيحة مُدخلة من الأدمن. أي مباراة ناقصة = 0 نقطة فوراً.
-// 2) لا يوجد أي تعادل بالنقاط بين الفرق في الترتيب الحقيقي (وإلا فالترتيب
-//    غير محدد بشكل قاطع، فلا تُمنح أي نقطة لأي مستخدم في هذه الحالة).
-// 3) يجب أن يكون توقع المستخدم نفسه أيضاً غير متعادل (أي أن المستخدم
-//    فعلاً رتّب الفرق 1-2-3-4 بشكل حاسم عبر توقعاته للمباريات الست،
-//    وليس توقعاً ناقصاً أو فارغاً يُنتج تعادلاً صورياً بين الفرق).
-// 4) ترتيب التوقع (1 إلى 4) يجب أن يطابق الترتيب الحقيقي حرفياً وبالكامل.
-//
-// ✅ هذا يمنع تماماً مشكلة "نقاط فورية عند التسجيل": مستخدم جديد بلا
-// أي توقعات محفوظة سيحصل على hasTie = true (كل الفرق متعادلة عند 0 نقطة)
-// في دالة computeGroupOrder الخاصة بتوقعاته، وبالتالي صفر نقطة دائماً،
-// بغض النظر عن حالة النتائج الحقيقية.
-// =================================================================
 function computeGroupBonus(groupKey, realResults, userPredictions) {
     const real = computeGroupOrder(groupKey, realResults);
-    if (!real.isComplete || real.hasTie) return 0; // Rule 1: المجموعة غير مكتملة بعد
+    if (!real.isComplete || real.hasTie) return 0;
 
     const predicted = computeGroupOrder(groupKey, userPredictions);
-    if (!predicted.isComplete || predicted.hasTie) return 0; // توقع ناقص أو متعادل لا يُحسب
+    if (predicted.hasTie) return 0;
 
     const exactMatch = real.order.every((team, i) => team === predicted.order[i]);
-    return exactMatch ? 1 : 0; // Rule 2: نقطة واحدة فقط للترتيب الصحيح 100%
+    return exactMatch ? 3 : 0;
 }
 
-// =================================================================
-// 🔢 يحسب إجمالي نقاط الترتيب لكل المجموعات الـ 12 لمستخدم معيّن.
-// الحد الأقصى النظري: 12 نقطة (1 نقطة × 12 مجموعة).
-// تُستخدم هذه الدالة في الـ Leaderboard وفي عرض المجموعة الحالية، لضمان
-// أن القيمة نفسها تُحسب دائماً بنفس الطريقة في كل مكان (Rule 3).
-// =================================================================
-function computeAllGroupsBonus(realResults, userPredictions) {
-    let total = 0;
-    Object.keys(groupsData).forEach(g => {
-        total += computeGroupBonus(g, realResults, userPredictions);
-    });
-    return total;
-}
-
-// ✅ ملاحظة أمان: قبل أي حفظ، نتحقق أولاً من آخر نسخة محفوظة من النتائج
-// الحقيقية مباشرة من Firebase (وليس من الواجهة)، لمنع أي محاولة لتعديل
-// مباراة مقفلة عبر التلاعب بالواجهة (مثلاً من أدوات المطوّر في المتصفح).
 function saveDataToCloud() {
     if (!firebaseReady) {
         alert("⚠️ لم يتم ضبط Firebase. لا يمكن الحفظ الآن.");
@@ -524,11 +484,9 @@ function saveDataToCloud() {
             const realM = latestRealResults[m.id];
             const isLocked = realM && isValidScore(realM.a) && isValidScore(realM.b);
 
-            // أي مباراة سُجلت نتيجتها الحقيقية فعلاً تبقى مقفلة تماماً،
-            // سواء كنا في وضع التوقعات أو وضع إدخال النتائج الحقيقية.
             if (isLocked) {
                 blockedLockedMatch = true;
-                return; // لا تُضمَّن هذه المباراة في عملية الحفظ نهائياً
+                return;
             }
 
             const valA = inputA.value.trim();
@@ -589,8 +547,6 @@ function calculateSystem(realResults, userPredictions) {
         const predictionExists = isValidScore(p.a) && isValidScore(p.b);
         const realExists = isValidScore(r.a) && isValidScore(r.b);
 
-        // pPoints/rPoints هنا هي نقاط ترتيب الفرق الفعلية (3 فوز / 1 تعادل)
-        // وليست نقاط دقة توقع المستخدم - تبقى كما هي لأنها صحيحة فعلياً
         if (predictionExists) {
             let pa = parseInt(p.a, 10), pb = parseInt(p.b, 10);
             if (pa > pb) teamStats[m.tA].pPoints += 3;
@@ -606,15 +562,13 @@ function calculateSystem(realResults, userPredictions) {
             else if (rb > ra) teamStats[m.tB].rPoints += 3;
             else { teamStats[m.tA].rPoints += 1; teamStats[m.tB].rPoints += 1; }
 
-            // ✅ نقاط تحدي التوقعات الشخصية بالقاعدة الجديدة: 3 / 1 / 0
             if (predictionExists) {
                 let pa = parseInt(p.a, 10), pb = parseInt(p.b, 10);
-                challengePoints += pointsForPrediction(pa, pb, ra, rb);
+                challengePoints += pointsForPrediction(pa, pb, ra, rb, p.auto);
             }
         }
     });
 
-    // ✅ مكافأة توقع ترتيب المجموعة بالكامل (1 نقطة إضافية لو الترتيب مطابق تماماً، فقط إذا اكتملت كل نتائج المجموعة الحقيقية)
     const groupBonus = computeGroupBonus(currentGroup, realResults, userPredictions);
     challengePoints += groupBonus;
 
@@ -631,7 +585,7 @@ function calculateSystem(realResults, userPredictions) {
             bonusBadge.style.display = "none";
         } else if (groupBonus > 0) {
             bonusBadge.style.display = "block";
-            bonusBadge.textContent = `🏆 مبروك! توقعت ترتيب هذه المجموعة بالكامل بشكل صحيح: +1 نقطة`;
+            bonusBadge.textContent = `🏆 مبروك! توقعت ترتيب هذه المجموعة بالكامل بشكل صحيح: +3 نقاط`;
         } else {
             bonusBadge.style.display = "none";
         }
@@ -653,10 +607,8 @@ function calculateSystem(realResults, userPredictions) {
     }
 }
 
-// اسم المستخدم الخاص بحساب المالك/الأدمن - يُستثنى دائماً من جدول المتصدرين
 const ADMIN_USERNAME = "boukhalfa anes";
 
-// خريطة سريعة: id المباراة -> رمز المجموعة (مستخدمة لحساب نقاط المتصدرين)
 const matchIdToGroup = {};
 Object.keys(groupsData).forEach(g => {
     groupsData[g].matches.forEach(m => { matchIdToGroup[m.id] = g; });
@@ -665,60 +617,64 @@ Object.keys(groupsData).forEach(g => {
 function updateLeaderboard() {
     if (!firebaseReady) return;
 
-    db.collection("worldcup2026").doc("real_results").get().then(realDoc => {
-        let real = realDoc.exists ? realDoc.data() : {};
+    // 1. جلب جميع المستخدمين المسجلين في النظام
+    db.collection("users_passwords").get().then(usersSnapshot => {
+        let allUsers = [];
+        usersSnapshot.forEach(doc => {
+            let userId = doc.id;
+            let displayName = doc.data().displayName || userId;
+            
+            // 🚫 استثناء حساب المالك/الأدمن من الظهور نهائياً
+            if (userId.toLowerCase() !== ADMIN_USERNAME && displayName.toLowerCase() !== ADMIN_USERNAME) {
+                allUsers.push({ id: userId, name: displayName, points: 0 });
+            }
+        });
 
+        // 2. جلب التوقعات والنتائج الحقيقية لحساب النقاط
         db.collection("worldcup2026").get().then(querySnapshot => {
-            let scores = [];
+            let realDoc = querySnapshot.docs.find(d => d.id === "real_results");
+            let real = realDoc ? realDoc.data() : {};
+            
+            let predictionsMap = {};
             querySnapshot.forEach(doc => {
                 if (doc.id.startsWith("predict_")) {
-                    let user = doc.id.replace("predict_", "");
-
-                    // 🚫 استثناء حساب المالك/الأدمن من جدول المتصدرين
-                    if (user.toLowerCase() === ADMIN_USERNAME) return;
-
-                    let userPreds = doc.data();
-                    let totalPoints = 0;
-
-                    // ✅ نقاط كل مباراة بالقاعدة الجديدة: 3 دقيقة / 1 نتيجة صحيحة / 0 خطأ
-                    Object.keys(real).forEach(mId => {
-                        const realResult = real[mId];
-                        const userPred = userPreds[mId];
-                        if (
-                            userPred && isValidScore(userPred.a) && isValidScore(userPred.b) &&
-                            realResult && isValidScore(realResult.a) && isValidScore(realResult.b)
-                        ) {
-                            let pa = parseInt(userPred.a, 10), pb = parseInt(userPred.b, 10);
-                            let ra = parseInt(realResult.a, 10), rb = parseInt(realResult.b, 10);
-                            totalPoints += pointsForPrediction(pa, pb, ra, rb);
-                        }
-                    });
-
-                    // ✅ إضافة نقاط ترتيب المجموعات (1 نقطة لكل مجموعة متوقَّعة بشكل صحيح 100%، فقط بعد اكتمالها بالكامل - حد أقصى 12 نقطة)
-                    totalPoints += computeAllGroupsBonus(real, userPreds);
-
-                    scores.push({ user, points: totalPoints });
+                    predictionsMap[doc.id.replace("predict_", "")] = doc.data();
                 }
             });
 
-            if (scores.length === 0) {
-                renderLeaderboard([]);
-                return;
-            }
+            // 3. حساب النقاط لكل مستخدم (حتى من لم يضع توقعات سيحصل على 0)
+            allUsers.forEach(userObj => {
+                let userPreds = predictionsMap[userObj.id] || {};
+                let totalPoints = 0;
 
-            Promise.all(
-                scores.map(s =>
-                    db.collection("users_passwords").doc(s.user).get().then(udoc => ({
-                        name: (udoc.exists && udoc.data().displayName) ? udoc.data().displayName : s.user,
-                        points: s.points
-                    })).catch(() => ({ name: s.user, points: s.points }))
-                )
-            ).then(finalScores => {
-                finalScores.sort((a, b) => b.points - a.points);
-                renderLeaderboard(finalScores);
+                Object.keys(real).forEach(mId => {
+                    const realResult = real[mId];
+                    const userPred = userPreds[mId];
+                    if (
+                        userPred && isValidScore(userPred.a) && isValidScore(userPred.b) &&
+                        realResult && isValidScore(realResult.a) && isValidScore(realResult.b)
+                    ) {
+                        let pa = parseInt(userPred.a, 10), pb = parseInt(userPred.b, 10);
+                        let ra = parseInt(realResult.a, 10), rb = parseInt(realResult.b, 10);
+                        totalPoints += pointsForPrediction(pa, pb, ra, rb, userPred.auto);
+                    }
+                });
+
+                Object.keys(groupsData).forEach(g => {
+                    totalPoints += computeGroupBonus(g, real, userPreds);
+                });
+
+                userObj.points = totalPoints;
             });
-        }).catch(err => console.error(err));
-    }).catch(err => console.error(err));
+
+            // 4. ترتيب الجدول من الأعلى إلى الأسفل (وأصحاب الـ 0 في النهاية)
+            allUsers.sort((a, b) => b.points - a.points);
+            
+            // تمرير البيانات المحدثة لواجهة العرض
+            renderLeaderboard(allUsers);
+            
+        }).catch(err => console.error("Error fetching predictions: ", err));
+    }).catch(err => console.error("Error fetching users: ", err));
 }
 
 function renderLeaderboard(scores) {
