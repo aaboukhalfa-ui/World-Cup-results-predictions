@@ -8,7 +8,6 @@
 </head>
 <body>
 
-    <!-- شاشة تسجيل الدخول (نسخة واحدة فقط، لا يوجد تكرار مع الجافاسكريبت) -->
     <div id="login-screen" class="modal">
         <div class="modal-content">
 
@@ -64,6 +63,18 @@
 
         <main class="content-area card">
             <h2 id="current-group-title">⚽ مباريات المجموعة</h2>
+
+            <div id="admin-panel" style="display:none; margin-bottom: 25px; padding: 15px; border: 1px dashed var(--danger); border-radius: 8px; background-color: #1a0a0a;">
+                <h3 style="color: var(--danger); margin-bottom: 10px;">🛠️ لوحة الإدارة: تعديل أسماء اللاعبين</h3>
+                <p style="font-size: 0.85rem; color: #ccc; margin-bottom: 15px;">أدخل المعرف الأصلي (ID) الذي سجّل به اللاعب دخوله، ثم اكتب الاسم الجديد اللائق ليظهر في جدول المتصدرين.</p>
+                
+                <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+                    <input type="text" id="admin-target-id" placeholder="اسم الحساب الأصلي (ID)..." style="flex:1; min-width: 200px; padding: 10px; border-radius: 6px; background: #000; border: 1px solid var(--danger); color: white;">
+                    <input type="text" id="admin-new-name" placeholder="الاسم الجديد اللائق..." style="flex:1; min-width: 200px; padding: 10px; border-radius: 6px; background: #000; border: 1px solid var(--danger); color: white;">
+                </div>
+                
+                <button class="btn" style="background: var(--danger); color: white; border: none;" onclick="renameUserByAdmin()">تحديث اسم اللاعب 🔄</button>
+            </div>
 
             <div id="groups-view">
                 <div id="matches-list"></div>
