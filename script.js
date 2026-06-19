@@ -1,6 +1,5 @@
 // =================================================================
-// ⚠️ ضع هنا بيانات مشروع Firebase الخاص بك (من إعدادات المشروع في console.firebase.google.com)
-// تم ملء البيانات بناءً على إعدادات مشروعك الحالية بنجاح ✅
+// ⚠️ ضع هنا بيانات مشروع Firebase الخاص بك
 // =================================================================
 const firebaseConfig = {
   apiKey: "AIzaSyBfMkvZYeQ-SwP791FkwiqOphiEtM8oeuk",
@@ -12,8 +11,7 @@ const firebaseConfig = {
   measurementId: "G-9TVP7VS1N7"
 };
 
-// كلمة مرور المالك لتسجيل النتائج الحقيقية وإدارة المنصة
-const ADMIN_PASSWORD = "2026";
+const ADMIN_PASSWORD = "1010";
 
 let firebaseReady = false;
 let db = null;
@@ -26,73 +24,39 @@ try {
     console.error("فشل الاتصال بـ Firebase. تأكد من ضبط firebaseConfig بشكل صحيح.", e);
 }
 
-// =================================================================
-// وظيفة الإدارة: تغيير اسم عرض اللاعب (Moderation)
-// =================================================================
-function renameUserByAdmin() {
-    let targetId = document.getElementById("admin-target-id").value.trim().toLowerCase();
-    let newName = document.getElementById("admin-new-name").value.trim();
-
-    if (!targetId || !newName) {
-        alert("⚠️ الرجاء إدخال اسم الحساب الأصلي والاسم اللائق الجديد.");
-        return;
-    }
-
-    db.collection("users_passwords").doc(targetId).get().then(doc => {
-        if (!doc.exists) {
-            alert("❌ لم يتم العثور على حساب بهذا الاسم. (تأكد من كتابة الـ ID/اسم الدخول الأصلي بدقة).");
-            return;
-        }
-
-        db.collection("users_passwords").doc(targetId).update({
-            displayName: newName
-        }).then(() => {
-            alert(`✅ تم تغيير الاسم في جدول الترتيب بنجاح إلى: ${newName}`);
-            document.getElementById("admin-target-id").value = "";
-            document.getElementById("admin-new-name").value = "";
-            updateLeaderboard(); // تحديث الجدول فوراً ليعكس الاسم الجديد
-        }).catch(err => {
-            console.error(err);
-            alert("❌ حدث خطأ أثناء التحديث.");
-        });
-    }).catch(err => {
-        console.error(err);
-        alert("❌ تعذر الاتصال بقاعدة البيانات.");
-    });
-}
-
 let currentUser = localStorage.getItem("prediction_user") || "";
 let currentUserDisplay = localStorage.getItem("prediction_user_display") || currentUser;
 let currentGroup = 'A';
 let currentMode = 'predict';
-let authMode = 'login'; // 'login' = حساب موجود, 'signup' = حساب جديد
+let authMode = 'login';
+let timerInterval = null; // لتشغيل عداد الإغلاق الحي التنازلي
 
-// قاعدة البيانات الكاملة لجميع المجموعات والـ 72 مباراة لمونديال 2026
+// قاعدة البيانات الكاملة لجميع المجموعات مع إضافة kickoffTime (بصيغة ISO كاملة) لتنفيذ نظام القفل
 const groupsData = {
     A: { name: "المجموعة الأولى", teams: ["المكسيك 🇲🇽", "جنوب إفريقيا 🇿🇦", "كوريا الجنوبية 🇰🇷", "جمهورية التشيك 🇨🇿"],
-         matches: [{id:"A1",tA:"المكسيك 🇲🇽",tB:"جنوب إفريقيا 🇿🇦"},{id:"A2",tA:"كوريا الجنوبية 🇰🇷",tB:"جمهورية التشيك 🇨🇿"},{id:"A3",tA:"المكسيك 🇲🇽",tB:"كوريا الجنوبية 🇰🇷"},{id:"A4",tA:"جنوب إفريقيا 🇿🇦",tB:"جمهورية التشيك 🇨🇿"},{id:"A5",tA:"المكسيك 🇲🇽",tB:"جمهورية التشيك 🇨🇿"},{id:"A6",tA:"كوريا الجنوبية 🇰🇷",tB:"جنوب إفريقيا 🇿🇦"}] },
+         matches: [{id:"A1",tA:"المكسيك 🇲🇽",tB:"جنوب إفريقيا 🇿🇦",kickoffTime:"2026-06-11T16:00:00Z"},{id:"A2",tA:"كوريا الجنوبية 🇰🇷",tB:"جمهورية التشيك 🇨🇿",kickoffTime:"2026-06-11T19:00:00Z"},{id:"A3",tA:"المكسيك 🇲🇽",tB:"كوريا الجنوبية 🇰🇷",kickoffTime:"2026-06-15T15:00:00Z"},{id:"A4",tA:"جنوب إفريقيا 🇿🇦",tB:"جمهورية التشيك 🇨🇿",kickoffTime:"2026-06-15T18:00:00Z"},{id:"A5",tA:"المكسيك 🇲🇽",tB:"جمهورية التشيك 🇨🇿",kickoffTime:"2026-06-19T15:00:00Z"},{id:"A6",tA:"كوريا الجنوبية 🇰🇷",tB:"جنوب إفريقيا 🇿🇦",kickoffTime:"2026-06-19T18:00:00Z"}] },
     B: { name: "المجموعة الثانية", teams: ["كندا 🇨🇦", "البوسنة والهرسك 🇧🇦", "قطر 🇶🇦", "سويسرا 🇨🇭"],
-         matches: [{id:"B1",tA:"كندا 🇨🇦",tB:"البوسنة والهرسك 🇧🇦"},{id:"B2",tA:"قطر 🇶🇦",tB:"سويسرا 🇨🇭"},{id:"B3",tA:"كندا 🇨🇦",tB:"قطر 🇶🇦"},{id:"B4",tA:"البوسنة والهرسك 🇧🇦",tB:"سويسرا 🇨🇭"},{id:"B5",tA:"كندا 🇨🇦",tB:"سويسرا 🇨🇭"},{id:"B6",tA:"قطر 🇶🇦",tB:"البوسنة والهرسك 🇧🇦"}] },
+         matches: [{id:"B1",tA:"كندا 🇨🇦",tB:"البوسنة والهرسك 🇧🇦",kickoffTime:"2026-06-12T14:00:00Z"},{id:"B2",tA:"قطر 🇶🇦",tB:"سويسرا 🇨🇭",kickoffTime:"2026-06-12T17:00:00Z"},{id:"B3",tA:"كندا 🇨🇦",tB:"قطر 🇶🇦",kickoffTime:"2026-06-16T16:00:00Z"},{id:"B4",tA:"البوسنة والهرسك 🇧🇦",tB:"سويسرا 🇨🇭",kickoffTime:"2026-06-16T19:00:00Z"},{id:"B5",tA:"كندا 🇨🇦",tB:"سويسرا 🇨🇭",kickoffTime:"2026-06-20T14:00:00Z"},{id:"B6",tA:"قطر 🇶🇦",tB:"البوسنة والهرسك 🇧🇦",kickoffTime:"2026-06-20T17:00:00Z"}] },
     C: { name: "المجموعة الثالثة", teams: ["البرازيل 🇧🇷", "المغرب 🇲🇦", "هايتي 🇭🇹", "اسكتلندا 🏴"],
-         matches: [{id:"C1",tA:"البرازيل 🇧🇷",tB:"المغرب 🇲🇦"},{id:"C2",tA:"هايتي 🇭🇹",tB:"اسكتلندا 🏴"},{id:"C3",tA:"البرازيل 🇧🇷",tB:"هايتي 🇭🇹"},{id:"C4",tA:"المغرب 🇲🇦",tB:"اسكتلندا 🏴"},{id:"C5",tA:"البرازيل 🇧🇷",tB:"اسكتلندا 🏴"},{id:"C6",tA:"هايتي 🇭🇹",tB:"المغرب 🇲🇦"}] },
+         matches: [{id:"C1",tA:"البرازيل 🇧🇷",tB:"المغرب 🇲🇦",kickoffTime:"2026-06-12T20:00:00Z"},{id:"C2",tA:"هايتي 🇭🇹",tB:"اسكتلندا 🏴",kickoffTime:"2026-06-13T13:00:00Z"},{id:"C3",tA:"البرازيل 🇧🇷",tB:"هايتي 🇭🇹",kickoffTime:"2026-06-17T15:00:00Z"},{id:"C4",tA:"المغرب 🇲🇦",tB:"اسكتلندا 🏴",kickoffTime:"2026-06-17T18:00:00Z"},{id:"C5",tA:"البرازيل 🇧🇷",tB:"اسكتلندا 🏴",kickoffTime:"2026-06-21T16:00:00Z"},{id:"C6",tA:"هايتي 🇭🇹",tB:"المغرب 🇲🇦",kickoffTime:"2026-06-21T19:00:00Z"}] },
     D: { name: "المجموعة الرابعة", teams: ["الولايات المتحدة 🇺🇸", "باراغواي 🇵🇾", "أستراليا 🇦🇺", "تركيا 🇹🇷"],
-         matches: [{id:"D1",tA:"الولايات المتحدة 🇺🇸",tB:"باراغواي 🇵🇾"},{id:"D2",tA:"أستراليا 🇦🇺",tB:"تركيا 🇹🇷"},{id:"D3",tA:"الولايات المتحدة 🇺🇸",tB:"أستراليا 🇦🇺"},{id:"D4",tA:"باراغواي 🇵🇾",tB:"تركيا 🇹🇷"},{id:"D5",tA:"الولايات المتحدة 🇺🇸",tB:"تركيا 🇹🇷"},{id:"D6",tA:"أستراليا 🇦🇺",tB:"باراغواي 🇵🇾"}] },
+         matches: [{id:"D1",tA:"الولايات المتحدة 🇺🇸",tB:"باراغواي 🇵🇾",kickoffTime:"2026-06-13T16:00:00Z"},{id:"D2",tA:"أستراليا 🇦🇺",tB:"تركيا 🇹🇷",kickoffTime:"2026-06-13T19:00:00Z"},{id:"D3",tA:"الولايات المتحدة 🇺🇸",tB:"أستراليا 🇦🇺",kickoffTime:"2026-06-18T14:00:00Z"},{id:"D4",tA:"باراغواي 🇵🇾",tB:"تركيا 🇹🇷",kickoffTime:"2026-06-18T17:00:00Z"},{id:"D5",tA:"الولايات المتحدة 🇺🇸",tB:"تركيا 🇹🇷",kickoffTime:"2026-06-22T14:00:00Z"},{id:"D6",tA:"أستراليا 🇦🇺",tB:"باراغواي 🇵🇾",kickoffTime:"2026-06-22T17:00:00Z"}] },
     E: { name: "المجموعة الخامسة", teams: ["ألمانيا 🇩🇪", "كوراساو 🇨🇼", "كوت ديفوار 🇨🇮", "الإكوادور 🇪🇨"],
-         matches: [{id:"E1",tA:"ألمانيا 🇩🇪",tB:"كوراساو 🇨🇼"},{id:"E2",tA:"كوت ديفوار 🇨🇮",tB:"الإكوادور 🇪🇨"},{id:"E3",tA:"ألمانيا 🇩🇪",tB:"كوت ديفوار 🇨🇮"},{id:"E4",tA:"كوراساو 🇨🇼",tB:"الإكوادور 🇪🇨"},{id:"E5",tA:"ألمانيا 🇩🇪",tB:"الإكوادور 🇪🇨"},{id:"E6",tA:"كوت ديفوار 🇨🇮",tB:"كوراساو 🇨🇼"}] },
+         matches: [{id:"E1",tA:"ألمانيا 🇩🇪",tB:"كوراساو 🇨🇼",kickoffTime:"2026-06-14T13:00:00Z"},{id:"E2",tA:"كوت ديفوار 🇨🇮",tB:"الإكوادور 🇪🇨",kickoffTime:"2026-06-14T16:00:00Z"},{id:"E3",tA:"ألمانيا 🇩🇪",tB:"كوت ديفوار 🇨🇮",kickoffTime:"2026-06-19T13:00:00Z"},{id:"E4",tA:"كوراساو 🇨🇼",tB:"الإكوادور 🇪🇨",kickoffTime:"2026-06-19T20:00:00Z"},{id:"E5",tA:"ألمانيا 🇩🇪",tB:"الإكوادور 🇪🇨",kickoffTime:"2026-06-23T15:00:00Z"},{id:"E6",tA:"كوت ديفوار 🇨🇮",tB:"كوراساو 🇨🇼",kickoffTime:"2026-06-23T18:00:00Z"}] },
     F: { name: "المجموعة السادسة", teams: ["هولندا 🇳🇱", "اليابان 🇯🇵", "السويد 🇸🇪", "تونس 🇹🇳"],
-         matches: [{id:"F1",tA:"هولندا 🇳🇱",tB:"اليابان 🇯🇵"},{id:"F2",tA:"السويد 🇸🇪",tB:"تونس 🇹🇳"},{id:"F3",tA:"هولندا 🇳🇱",tB:"السويد 🇸🇪"},{id:"F4",tA:"اليابان 🇯🇵",tB:"تونس 🇹🇳"},{id:"F5",tA:"هولندا 🇳🇱",tB:"تونس 🇹🇳"},{id:"F6",tA:"السويد 🇸🇪",tB:"اليابان 🇯🇵"}] },
+         matches: [{id:"F1",tA:"هولندا 🇳🇱",tB:"اليابان 🇯🇵",kickoffTime:"2026-06-14T19:00:00Z"},{id:"F2",tA:"السويد 🇸🇪",tB:"تونس 🇹🇳",kickoffTime:"2026-06-15T13:00:00Z"},{id:"F3",tA:"هولندا 🇳🇱",tB:"السويد 🇸🇪",kickoffTime:"2026-06-20T13:00:00Z"},{id:"F4",tA:"اليابان 🇯🇵",tB:"تونس 🇹🇳",kickoffTime:"2026-06-20T20:00:00Z"},{id:"F5",tA:"هولندا 🇳🇱",tB:"تونس 🇹🇳",kickoffTime:"2026-06-24T14:00:00Z"},{id:"F6",tA:"السويد 🇸🇪",tB:"اليابان 🇯🇵",kickoffTime:"2026-06-24T17:00:00Z"}] },
     G: { name: "المجموعة السابعة", teams: ["بلجيكا 🇧🇪", "مصر 🇪🇬", "إيران 🇮🇷", "نيوزيلندا 🇳🇿"],
-         matches: [{id:"G1",tA:"بلجيكا 🇧🇪",tB:"مصر 🇪🇬"},{id:"G2",tA:"إيران 🇮🇷",tB:"نيوزيلندا 🇳🇿"},{id:"G3",tA:"بلجيكا 🇧🇪",tB:"إيران 🇮🇷"},{id:"G4",tA:"مصر 🇪🇬",tB:"نيوزيلندا 🇳🇿"},{id:"G5",tA:"بلجيكا 🇧🇪",tB:"نيوزيلندا 🇳🇿"},{id:"G6",tA:"إيران 🇮🇷",tB:"مصر 🇪🇬"}] },
+         matches: [{id:"G1",tA:"بلجيكا 🇧🇪",tB:"مصر 🇪🇬",kickoffTime:"2026-06-15T21:00:00Z"},{id:"G2",tA:"إيران 🇮🇷",tB:"نيوزيلندا 🇳🇿",kickoffTime:"2026-06-16T13:00:00Z"},{id:"G3",tA:"بلجيكا 🇧🇪",tB:"إيران 🇮🇷",kickoffTime:"2026-06-21T13:00:00Z"},{id:"G4",tA:"مصر 🇪🇬",tB:"نيوزيلندا 🇳🇿",kickoffTime:"2026-06-21T20:00:00Z"},{id:"G5",tA:"بلجيكا 🇧🇪",tB:"نيوزيلندا 🇳🇿",kickoffTime:"2026-06-25T15:00:00Z"},{id:"G6",tA:"إيران 🇮🇷",tB:"مصر 🇪🇬",kickoffTime:"2026-06-25T18:00:00Z"}] },
     H: { name: "المجموعة الثامنة", teams: ["إسبانيا 🇪🇸", "الرأس الأخضر 🇨🇻", "السعودية 🇸🇦", "الأوروغواي 🇺🇾"],
-         matches: [{id:"H1",tA:"إسبانيا 🇪🇸",tB:"الرأس الأخضر 🇨🇻"},{id:"H2",tA:"السعودية 🇸🇦",tB:"الأوروغواي 🇺🇾"},{id:"H3",tA:"إسبانيا 🇪🇸",tB:"السعودية 🇸🇦"},{id:"H4",tA:"الرأس الأخضر 🇨🇻",tB:"الأوروغواي 🇺🇾"},{id:"H5",tA:"إسبانيا 🇪🇸",tB:"الأوروغواي 🇺🇾"},{id:"H6",tA:"السعودية 🇸🇦",tB:"الرأس الأخضر 🇨🇻"}] },
+         matches: [{id:"H1",tA:"إسبانيا 🇪🇸",tB:"الرأس الأخضر 🇨🇻",kickoffTime:"2026-06-16T16:00:00Z"},{id:"H2",tA:"السعودية 🇸🇦",tB:"الأوروغواي 🇺🇾",kickoffTime:"2026-06-16T19:00:00Z"},{id:"H3",tA:"إسبانيا 🇪🇸",tB:"السعودية 🇸🇦",kickoffTime:"2026-06-22T13:00:00Z"},{id:"H4",tA:"الرأس الأخضر 🇨🇻",tB:"الأوروغواي 🇺🇾",kickoffTime:"2026-06-22T20:00:00Z"},{id:"H5",tA:"إسبانيا 🇪🇸",tB:"الأوروغواي 🇺🇾",kickoffTime:"2026-06-26T14:00:00Z"},{id:"H6",tA:"السعودية 🇸🇦",tB:"الرأس الأخضر 🇨🇻",kickoffTime:"2026-06-26T17:00:00Z"}] },
     I: { name: "المجموعة التاسعة", teams: ["فرنسا 🇫🇷", "السنغال 🇸🇳", "العراق 🇮🇶", "النرويج 🇳🇴"],
-         matches: [{id:"I1",tA:"فرنسا 🇫🇷",tB:"السنغال 🇸🇳"},{id:"I2",tA:"العراق 🇮🇶",tB:"النرويج 🇳🇴"},{id:"I3",tA:"فرنسا 🇫🇷",tB:"العراق 🇮🇶"},{id:"I4",tA:"السنغال 🇸🇳",tB:"النرويج 🇳🇴"},{id:"I5",tA:"فرنسا 🇫🇷",tB:"النرويج 🇳🇴"},{id:"I6",tA:"العراق 🇮🇶",tB:"السنغال 🇸🇳"}] },
+         matches: [{id:"I1",tA:"فرنسا 🇫🇷",tB:"السنغال 🇸🇳",kickoffTime:"2026-06-17T13:00:00Z"},{id:"I2",tA:"العراق 🇮🇶",tB:"النرويج 🇳🇴",kickoffTime:"2026-06-17T20:00:00Z"},{id:"I3",tA:"فرنسا 🇫🇷",tB:"العراق 🇮🇶",kickoffTime:"2026-06-23T13:00:00Z"},{id:"I4",tA:"السنغال 🇸🇳",tB:"النرويج 🇳🇴",kickoffTime:"2026-06-23T20:00:00Z"},{id:"I5",tA:"فرنسا 🇫🇷",tB:"النرويج 🇳🇴",kickoffTime:"2026-06-27T15:00:00Z"},{id:"I6",tA:"العراق 🇮🇶",tB:"السنغال 🇸🇳",kickoffTime:"2026-06-27T18:00:00Z"}] },
     J: { name: "المجموعة العاشرة", teams: ["الأرجنتين 🇦🇷", "الجزائر 🇩🇿", "النمسا 🇦🇹", "الأردن 🇯🇴"],
-         matches: [{id:"J1",tA:"الأرجنتين 🇦🇷",tB:"الجزائر 🇩🇿"},{id:"J2",tA:"النمسا 🇦🇹",tB:"الأردن 🇯🇴"},{id:"J3",tA:"الأرجنتين 🇦🇷",tB:"النمسا 🇦🇹"},{id:"J4",tA:"الجزائر 🇩🇿",tB:"الأردن 🇯🇴"},{id:"J5",tA:"الأرجنتين 🇦🇷",tB:"الأردن 🇯🇴"},{id:"J6",tA:"النمسا 🇦🇹",tB:"الجزائر 🇩🇿"}] },
+         matches: [{id:"J1",tA:"الأرجنتين 🇦🇷",tB:"الجزائر 🇩🇿",kickoffTime:"2026-06-18T13:00:00Z"},{id:"J2",tA:"النمسا 🇦🇹",tB:"الأردن 🇯🇴",kickoffTime:"2026-06-18T20:00:00Z"},{id:"J3",tA:"الأرجنتين 🇦🇷",tB:"النمسا 🇦🇹",kickoffTime:"2026-06-24T13:00:00Z"},{id:"J4",tA:"الجزائر 🇩🇿",tB:"الأردن 🇯🇴",kickoffTime:"2026-06-24T20:00:00Z"},{id:"J5",tA:"الأرجنتين 🇦🇷",tB:"الأردن 🇯🇴",kickoffTime:"2026-06-28T14:00:00Z"},{id:"J6",tA:"النمسا 🇦🇹",tB:"الجزائر 🇩🇿",kickoffTime:"2026-06-28T17:00:00Z"}] },
     K: { name: "المجموعة الحادية عشرة", teams: ["البرتغال 🇵🇹", "الكونغو الديمقراطية 🇨🇩", "أوزبكستان 🇺🇿", "كولومبيا 🇨🇴"],
-         matches: [{id:"K1",tA:"البرتغال 🇵🇹",tB:"الكونغو الديمقراطية 🇨🇩"},{id:"K2",tA:"أوزبكستان 🇺🇿",tB:"كولومبيا 🇨🇴"},{id:"K3",tA:"البرتغال 🇵🇹",tB:"أوزبكستان 🇺🇿"},{id:"K4",tA:"الكونغو الديمقراطية 🇨🇩",tB:"كولومبيا 🇨🇴"},{id:"K5",tA:"البرتغال 🇵🇹",tB:"كولومبيا 🇨🇴"},{id:"K6",tA:"أوزبكستان 🇺🇿",tB:"الكونغو الديمقراطية 🇨🇩"}] },
+         matches: [{id:"K1",tA:"البرتغال 🇵🇹",tB:"الكونغو الديمقراطية 🇨🇩",kickoffTime:"2026-06-19T13:00:00Z"},{id:"K2",tA:"أوزبكستان 🇺🇿",tB:"كولومبيا 🇨🇴",kickoffTime:"2026-06-19T20:00:00Z"},{id:"K3",tA:"البرتغال 🇵🇹",tB:"أوزبكستان 🇺🇿",kickoffTime:"2026-06-25T13:00:00Z"},{id:"K4",tA:"الكونغو الديمقراطية 🇨🇩",tB:"كولومبيا 🇨🇴",kickoffTime:"2026-06-25T20:00:00Z"},{id:"K5",tA:"البرتغال 🇵🇹",tB:"كولومبيا 🇨🇴",kickoffTime:"2026-06-29T15:00:00Z"},{id:"K6",tA:"أوزبكستان 🇺🇿",tB:"الكونغو الديمقراطية 🇨🇩",kickoffTime:"2026-06-29T18:00:00Z"}] },
     L: { name: "المجموعة الثانية عشرة", teams: ["إنجلترا 🏴", "كرواتيا 🇭🇷", "غانا 🇬🇭", "بنما 🇵🇦"],
-         matches: [{id:"L1",tA:"إنجلترا 🏴",tB:"كرواتيا 🇭🇷"},{id:"L2",tA:"غانا 🇬🇭",tB:"بنما 🇵🇦"},{id:"L3",tA:"إنجلترا 🏴",tB:"غانا 🇬🇭"},{id:"L4",tA:"كرواتيا 🇭🇷",tB:"بنما 🇵🇦"},{id:"L5",tA:"إنجلترا 🏴",tB:"بنما 🇵🇦"},{id:"L6",tA:"غانا 🇬🇭",tB:"كرواتيا 🇭🇷"}] }
+         matches: [{id:"L1",tA:"إنجلترا 🏴",tB:"كرواتيا 🇭🇷",kickoffTime:"2026-06-20T13:00:00Z"},{id:"L2",tA:"غانا 🇬🇭",tB:"بنما 🇵🇦",kickoffTime:"2026-06-20T20:00:00Z"},{id:"L3",tA:"إنجلترا 🏴",tB:"غانا 🇬🇭",kickoffTime:"2026-06-26T13:00:00Z"},{id:"L4",tA:"كرواتيا 🇭🇷",tB:"بنما 🇵🇦",kickoffTime:"2026-06-26T20:00:00Z"},{id:"L5",tA:"إنجلترا 🏴",tB:"بنما 🇵🇦",kickoffTime:"2026-06-30T15:00:00Z"},{id:"L6",tA:"غانا 🇬🇭",tB:"كرواتيا 🇭🇷",kickoffTime:"2026-06-30T18:00:00Z"}] }
 };
 
 // =================================================================
@@ -237,7 +201,8 @@ function loginUser() {
                 loginBtn.textContent = "دخول 🚀";
                 return;
             }
-            db.collection("users_passwords").doc(name).set({ password: pass, displayName: rawName }).then(() => {
+            // عند إنشاء حساب جديد، نقوم بتهيئة حقل الترتيب السابق بقيمة افتراضية فارغة
+            db.collection("users_passwords").doc(name).set({ password: pass, displayName: rawName, previousRank: null }).then(() => {
                 successLogin(name, rawName);
             }).catch(err => {
                 console.error(err);
@@ -269,6 +234,8 @@ function logoutUser() {
     currentUserDisplay = "";
     currentMode = 'predict';
 
+    if (timerInterval) clearInterval(timerInterval);
+
     document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
     document.getElementById('btn-predict-mode').classList.add('active');
 
@@ -282,20 +249,14 @@ function logoutUser() {
 }
 
 function setMode(mode) {
-    const adminPanel = document.getElementById('admin-panel');
-    
     if (mode === 'real') {
-        let password = prompt("أدخل رمز المالك (PIN) لتسجيل النتائج وإدارة اللاعبين:");
+        let password = prompt("أدخل رمز المالك لتسجيل النتائج الحقيقية:");
         if (password === null) return;
         if (password !== ADMIN_PASSWORD) {
             alert("❌ رمز غير صحيح!");
             return;
         }
-        if (adminPanel) adminPanel.style.display = 'block';
-    } else {
-        if (adminPanel) adminPanel.style.display = 'none';
     }
-    
     currentMode = mode;
     document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
     document.getElementById(`btn-${mode}-mode`).classList.add('active');
@@ -318,7 +279,6 @@ function loadData() {
         db.collection("worldcup2026").doc(`predict_${currentUser}`).get().then(userDoc => {
             let userPredictions = userDoc.exists ? userDoc.data() : {};
 
-            // ✅ تعبئة تلقائية للمباريات المنتهية التي لم يتوقعها المستخدم
             autoFillMissedPredictions(currentGroup, realResults, userPredictions).then(updatedPredictions => {
                 renderMatchesLayout(realResults, updatedPredictions);
                 calculateSystem(realResults, updatedPredictions);
@@ -349,8 +309,8 @@ function autoFillMissedPredictions(groupKey, realResults, userPredictions) {
         const predIsSet = pred && isValidScore(pred.a) && isValidScore(pred.b);
         if (predIsSet) return; 
 
-        userPredictions[m.id] = { a: real.a, b: real.b, auto: true };
-        toSave[m.id] = { a: real.a, b: real.b, auto: true };
+        userPredictions[m.id] = { a: real.a, b: real.b, auto: true, isJoker: false };
+        toSave[m.id] = { a: real.a, b: real.b, auto: true, isJoker: false };
         changed = true;
     });
 
@@ -363,8 +323,61 @@ function autoFillMissedPredictions(groupKey, realResults, userPredictions) {
         .then(() => userPredictions)
         .catch(err => {
             console.error("فشل حفظ التعبئة التلقائية:", err);
-            return userPredictions;
+            return userPredictions; 
         });
+}
+
+// 3️⃣ تفعيل العداد والتحقق المستمر لقفل الإدخال تلقائياً قبل البدء بـ 15 دقيقة
+function startCountdownTimers() {
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+        const elements = document.querySelectorAll('.countdown-timer-span');
+        let currentGroupMatches = groupsData[currentGroup]?.matches || [];
+        
+        elements.forEach(el => {
+            let kickoffStr = el.getAttribute('data-kickoff');
+            if (!kickoffStr) return;
+            
+            let kickoffTime = new Date(kickoffStr).getTime();
+            let now = Date.now();
+            let timeUntilLock = kickoffTime - 15 * 60 * 1000 - now; // الوقت المتبقي حتى موعد القفل (قبل 15 دقيقة من الركلة)
+
+            if (timeUntilLock <= 0) {
+                el.innerHTML = `<span class="locked-text">🔒 مقفلة الآن</span>`;
+                // قفل الحقول المرتبطة بها في المتصفح فوراً دون الحاجة لإعادة التحديث
+                let mId = el.getAttribute('data-match-id');
+                let inpA = document.getElementById(`inputA-${mId}`);
+                let inpB = document.getElementById(`inputB-${mId}`);
+                let jBtn = document.getElementById(`joker-btn-${mId}`);
+                if (inpA && currentMode === 'predict') inpA.disabled = true;
+                if (inpB && currentMode === 'predict') inpB.disabled = true;
+                if (jBtn && currentMode === 'predict') jBtn.disabled = true;
+            } else {
+                let days = Math.floor(timeUntilLock / (1000 * 60 * 60 * 24));
+                let hours = Math.floor((timeUntilLock % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                let minutes = Math.floor((timeUntilLock % (1000 * 60 * 60)) / (1000 * 60));
+                let seconds = Math.floor((timeUntilLock % (1000 * 60)) / 1000);
+                
+                let countdownStr = "⏳ يغلق بعد: ";
+                if (days > 0) countdownStr += `${days} يوم و `;
+                countdownStr += `${hours}:${minutes < 10 ? '0' + minutes : minutes}:${seconds < 10 ? '0' + seconds : seconds}`;
+                el.innerHTML = `<span class="timer-active">${countdownStr}</span>`;
+            }
+        });
+
+        // إخفاء زر الحفظ بالكامل إذا كانت جميع المباريات في هذه المجموعة مقفلة التوقع
+        if (currentMode === 'predict' && currentGroup !== 'knockout') {
+            let disabledInputs = document.querySelectorAll('.score-input:not(:disabled)');
+            const saveBtn = document.getElementById('save-btn');
+            if (saveBtn) {
+                if (disabledInputs.length === 0) {
+                    saveBtn.style.display = 'none';
+                } else {
+                    saveBtn.style.display = 'block';
+                }
+            }
+        }
+    }, 1000);
 }
 
 function renderMatchesLayout(realResults, userPredictions) {
@@ -372,16 +385,45 @@ function renderMatchesLayout(realResults, userPredictions) {
     if (!container) return;
     container.innerHTML = "";
 
+    let anyActiveInputs = false;
+
     groupsData[currentGroup].matches.forEach(m => {
         let isRealExist = (realResults[m.id] && realResults[m.id].a !== undefined && realResults[m.id].a !== "");
-        let saved = currentMode === 'real' ? (realResults[m.id] || { a: "", b: "" }) : (userPredictions[m.id] || { a: "", b: "" });
+        let saved = currentMode === 'real' ? (realResults[m.id] || { a: "", b: "" }) : (userPredictions[m.id] || { a: "", b: "", isJoker: false });
 
-        let isDisabled = isRealExist ? "disabled" : "";
+        // 3️⃣ التحقق من موعد المباراة لقفل الحقول تلقائياً قبل الركلة بـ 15 دقيقة
+        let kickoff = m.kickoffTime ? new Date(m.kickoffTime).getTime() : 0;
+        let isTimeLocked = kickoff ? (kickoff - Date.now() <= 15 * 60 * 1000) : false;
+
+        let isDisabled = "";
+        if (isRealExist) {
+            isDisabled = "disabled";
+        } else if (isTimeLocked && currentMode === 'predict') {
+            isDisabled = "disabled";
+        }
+
+        if (!isDisabled) anyActiveInputs = true;
+
         let lockNote = "";
         if (isRealExist) {
             lockNote = currentMode === 'real'
                 ? `<span class="match-locked-note">🔒 النتيجة محفوظة بشكل نهائي - لا يمكن تعديلها</span>`
                 : `<span class="match-locked-note">🔒 انتهت المباراة - التوقع مقفل</span>`;
+        } else if (isTimeLocked && currentMode === 'predict') {
+            lockNote = `<span class="match-locked-note locked-text">🔒 مقفلة (بدأت أو تبقت أقل من 15 دقيقة)</span>`;
+        } else if (m.kickoffTime) {
+            lockNote = `<span class="match-locked-note countdown-timer-span" data-match-id="${m.id}" data-kickoff="${m.kickoffTime}">⏳ جاري حساب الوقت...</span>`;
+        }
+
+        // 1️⃣ إضافة واجهة مستخدم زر الجوكر التفاعلي
+        let jokerHtml = "";
+        if (currentMode === 'predict') {
+            let isJokerActive = saved.isJoker ? "active" : "";
+            jokerHtml = `
+                <button class="joker-btn ${isJokerActive}" id="joker-btn-${m.id}" onclick="toggleJoker('${m.id}')" ${isDisabled}>
+                    🃏 <span class="joker-label">جوكر التحدي</span>
+                </button>
+            `;
         }
 
         container.innerHTML += `
@@ -393,12 +435,45 @@ function renderMatchesLayout(realResults, userPredictions) {
                         <span class="vs-text">ضد</span>
                         <input type="number" min="0" step="1" ${isDisabled} class="score-input" id="inputB-${m.id}" value="${saved.b !== undefined ? saved.b : ''}">
                     </div>
-                    ${lockNote}
+                    <div class="match-status-bar">
+                        ${jokerHtml}
+                        ${lockNote}
+                    </div>
                 </div>
                 <span class="team-name">${escapeHtml(m.tB)}</span>
             </div>
         `;
     });
+
+    const saveBtn = document.getElementById('save-btn');
+    if (saveBtn) {
+        if (!anyActiveInputs && currentMode === 'predict') {
+            saveBtn.style.display = 'none';
+        } else {
+            saveBtn.style.display = 'block';
+        }
+    }
+
+    startCountdownTimers();
+}
+
+// 1️⃣ تفعيل اختيار جوكر واحد فقط لكل مجموعة وسحب البقية تلقائياً
+function toggleJoker(matchId) {
+    const clickedBtn = document.getElementById(`joker-btn-${matchId}`);
+    if (!clickedBtn || clickedBtn.hasAttribute('disabled')) return;
+
+    const isCurrentlyActive = clickedBtn.classList.contains('active');
+
+    // إزالة تفعيل أي جوكر آخر مفعل في واجهة المجموعة الحالية فوراً
+    groupsData[currentGroup].matches.forEach(m => {
+        const btn = document.getElementById(`joker-btn-${m.id}`);
+        if (btn) btn.classList.remove('active');
+    });
+
+    // تفعيل الزر المختار فقط إذا لم يكن مفعلاً سابقاً
+    if (!isCurrentlyActive) {
+        clickedBtn.classList.add('active');
+    }
 }
 
 function escapeHtml(str) {
@@ -413,12 +488,21 @@ function isValidScore(value) {
     return true;
 }
 
-function pointsForPrediction(pa, pb, ra, rb, isAuto) {
+// 1️⃣ تحديث آلية احتساب النقاط وتضمين مضاعف الجوكر المختار بنجاح
+function pointsForPrediction(pa, pb, ra, rb, isAuto, isJoker = false) {
     if (isAuto) return 0;
-    if (pa === ra && pb === rb) return 3;
-    const predictedOutcome = pa > pb ? 'A' : (pb > pa ? 'B' : 'D');
-    const realOutcome = ra > rb ? 'A' : (rb > ra ? 'B' : 'D');
-    return predictedOutcome === realOutcome ? 1 : 0;
+    let pts = 0;
+    if (pa === ra && pb === rb) {
+        pts = 3;
+    } else {
+        const predictedOutcome = pa > pb ? 'A' : (pb > pa ? 'B' : 'D');
+        const realOutcome = ra > rb ? 'A' : (rb > ra ? 'B' : 'D');
+        if (predictedOutcome === realOutcome) pts = 1;
+    }
+
+    // مضاعفة النقاط كاملة إذا تم تحديد المباراة كجوكر بنجاح
+    if (isJoker) pts *= 2;
+    return pts;
 }
 
 function computeGroupOrder(groupKey, resultsObj) {
@@ -445,11 +529,7 @@ function computeGroupOrder(groupKey, resultsObj) {
         if (sorted[i].pts === sorted[i + 1].pts) { hasTie = true; break; }
     }
 
-    return {
-        order: sorted.map(s => s.name),
-        isComplete,
-        hasTie
-    };
+    return { order: sorted.map(s => s.name), isComplete, hasTie };
 }
 
 function computeGroupBonus(groupKey, realResults, userPredictions) {
@@ -484,19 +564,32 @@ function saveDataToCloud() {
             const realM = latestRealResults[m.id];
             const isLocked = realM && isValidScore(realM.a) && isValidScore(realM.b);
 
-            if (isLocked) {
+            // 3️⃣ التحقق الأمني السحابي لقفل المباراة لمنع التلاعب البرمي بالواجهة
+            let kickoff = m.kickoffTime ? new Date(m.kickoffTime).getTime() : 0;
+            let isTimeLocked = kickoff ? (kickoff - Date.now() <= 15 * 60 * 1000) : false;
+
+            if (isLocked || (isTimeLocked && currentMode === 'predict')) {
                 blockedLockedMatch = true;
-                return;
+                return; 
             }
 
             const valA = inputA.value.trim();
             const valB = inputB.value.trim();
 
+            // 1️⃣ جلب وتجهيز متغير حفظ الجوكر وحفظه بداخل كائن التوقع الحالي
+            let isJoker = false;
+            if (currentMode === 'predict') {
+                const jokerBtn = document.getElementById(`joker-btn-${m.id}`);
+                if (jokerBtn && jokerBtn.classList.contains('active')) {
+                    isJoker = true;
+                }
+            }
+
             inputA.classList.remove('invalid');
             inputB.classList.remove('invalid');
 
             if (valA === "" && valB === "") {
-                dataToSave[m.id] = { a: "", b: "" };
+                dataToSave[m.id] = currentMode === 'real' ? { a: "", b: "" } : { a: "", b: "", isJoker: false };
                 return;
             }
 
@@ -508,24 +601,27 @@ function saveDataToCloud() {
             }
 
             dataToSave[m.id] = { a: valA, b: valB };
+            if (currentMode === 'predict') {
+                dataToSave[m.id].isJoker = isJoker;
+            }
         });
 
         if (hasInvalid) {
-            alert("⚠️ تحقق من النتائج: يجب إدخال أعداد صحيحة غير سالبة لكل مباراة (أو تركها فارغة بالكامل).");
+            alert("⚠️ تحقق من النتائج: يجب إدخال أعداد صحيحة غير سالبة لكل مباراة.");
             return;
         }
 
         let docName = currentMode === 'real' ? "real_results" : `predict_${currentUser}`;
         db.collection("worldcup2026").doc(docName).set(dataToSave, { merge: true }).then(() => {
             if (blockedLockedMatch) {
-                alert("💾 تم الحفظ. ملاحظة: بعض المباريات كانت مقفلة بالفعل (نتيجتها الحقيقية مسجّلة) فلم يتم تعديلها.");
+                alert("💾 تم الحفظ. ملاحظة: بعض المباريات كانت مقفلة أو انتهى وقت توقعها فلم يتم تعديلها.");
             } else {
                 alert("💾 تم حفظ وإرسال البيانات بنجاح!");
             }
             loadData();
         }).catch(err => {
             console.error(err);
-            alert("❌ حدث خطأ أثناء الحفظ. تحقق من اتصال الإنترنت أو إعدادات Firebase.");
+            alert("❌ حدث خطأ أثناء الحفظ. تحقق من الاتصال.");
         });
     }).catch(err => {
         console.error(err);
@@ -541,7 +637,7 @@ function calculateSystem(realResults, userPredictions) {
 
     let challengePoints = 0;
     groupsData[currentGroup].matches.forEach(m => {
-        const p = userPredictions[m.id] || { a: "", b: "" };
+        const p = userPredictions[m.id] || { a: "", b: "", isJoker: false };
         const r = realResults[m.id] || { a: "", b: "" };
 
         const predictionExists = isValidScore(p.a) && isValidScore(p.b);
@@ -564,7 +660,8 @@ function calculateSystem(realResults, userPredictions) {
 
             if (predictionExists) {
                 let pa = parseInt(p.a, 10), pb = parseInt(p.b, 10);
-                challengePoints += pointsForPrediction(pa, pb, ra, rb, p.auto);
+                // 1️⃣ تمرير حالة حقل الجوكر لحساب النقاط الفورية المعروضة
+                challengePoints += pointsForPrediction(pa, pb, ra, rb, p.auto, p.isJoker || false);
             }
         }
     });
@@ -614,74 +711,106 @@ Object.keys(groupsData).forEach(g => {
     groupsData[g].matches.forEach(m => { matchIdToGroup[m.id] = g; });
 });
 
+// 2️⃣ حساب جدول الترتيب العام، تحديد المؤشرات وتحديث الترتيب السابق في قاعدة البيانات بـ Batch
 function updateLeaderboard() {
     if (!firebaseReady) return;
 
-    // 1. جلب جميع المستخدمين المسجلين في النظام
-    db.collection("users_passwords").get().then(usersSnapshot => {
-        let allUsers = [];
-        usersSnapshot.forEach(doc => {
-            let userId = doc.id;
-            let displayName = doc.data().displayName || userId;
-            
-            // 🚫 استثناء حساب المالك/الأدمن من الظهور نهائياً
-            if (userId.toLowerCase() !== ADMIN_USERNAME && displayName.toLowerCase() !== ADMIN_USERNAME) {
-                allUsers.push({ id: userId, name: displayName, points: 0 });
-            }
-        });
+    db.collection("worldcup2026").doc("real_results").get().then(realDoc => {
+        let real = realDoc.exists ? realDoc.data() : {};
 
-        // 2. جلب التوقعات والنتائج الحقيقية لحساب النقاط
         db.collection("worldcup2026").get().then(querySnapshot => {
-            let realDoc = querySnapshot.docs.find(d => d.id === "real_results");
-            let real = realDoc ? realDoc.data() : {};
-            
-            let predictionsMap = {};
+            let scores = [];
             querySnapshot.forEach(doc => {
                 if (doc.id.startsWith("predict_")) {
-                    predictionsMap[doc.id.replace("predict_", "")] = doc.data();
+                    let user = doc.id.replace("predict_", "");
+
+                    if (user.toLowerCase() === ADMIN_USERNAME) return;
+
+                    let userPreds = doc.data();
+                    let totalPoints = 0;
+
+                    Object.keys(real).forEach(mId => {
+                        const realResult = real[mId];
+                        const userPred = userPreds[mId];
+                        if (
+                            userPred && isValidScore(userPred.a) && isValidScore(userPred.b) &&
+                            realResult && isValidScore(realResult.a) && isValidScore(realResult.b)
+                        ) {
+                            let pa = parseInt(userPred.a, 10), pb = parseInt(userPred.b, 10);
+                            let ra = parseInt(realResult.a, 10), rb = parseInt(realResult.b, 10);
+                            // 1️⃣ قراءة وحساب مضاعفات نقاط الجوكر المدخرة في قاعدة البيانات لكل مستخدم
+                            totalPoints += pointsForPrediction(pa, pb, ra, rb, userPred.auto, userPred.isJoker || false);
+                        }
+                    });
+
+                    Object.keys(groupsData).forEach(g => {
+                        totalPoints += computeGroupBonus(g, real, userPreds);
+                    });
+
+                    scores.push({ user, points: totalPoints });
                 }
             });
 
-            // 3. حساب النقاط لكل مستخدم (حتى من لم يضع توقعات سيحصل على 0)
-            allUsers.forEach(userObj => {
-                let userPreds = predictionsMap[userObj.id] || {};
-                let totalPoints = 0;
+            if (scores.length === 0) {
+                renderLeaderboard([]);
+                return;
+            }
 
-                Object.keys(real).forEach(mId => {
-                    const realResult = real[mId];
-                    const userPred = userPreds[mId];
-                    if (
-                        userPred && isValidScore(userPred.a) && isValidScore(userPred.b) &&
-                        realResult && isValidScore(realResult.a) && isValidScore(realResult.b)
-                    ) {
-                        let pa = parseInt(userPred.a, 10), pb = parseInt(userPred.b, 10);
-                        let ra = parseInt(realResult.a, 10), rb = parseInt(realResult.b, 10);
-                        totalPoints += pointsForPrediction(pa, pb, ra, rb, userPred.auto);
+            Promise.all(
+                scores.map(s =>
+                    db.collection("users_passwords").doc(s.user).get().then(udoc => {
+                        let udata = udoc.exists ? udoc.data() : {};
+                        return {
+                            id: s.user,
+                            name: udata.displayName || s.user,
+                            points: s.points,
+                            previousRank: udata.previousRank !== undefined ? udata.previousRank : null
+                        };
+                    }).catch(() => ({ id: s.user, name: s.user, points: s.points, previousRank: null }))
+                )
+            ).then(finalScores => {
+                // ترتيب المتنافسين تنازلياً حسب إجمالي النقاط
+                finalScores.sort((a, b) => b.points - a.points);
+
+                let batch = db.batch();
+                let updatedAny = false;
+
+                finalScores.forEach((s, index) => {
+                    let currentRank = index + 1;
+                    
+                    // مقارنة الترتيب الحالي بالترتيب المدخر لتحديد الاتجاه
+                    if (s.previousRank === null) {
+                        s.trend = "same";
+                    } else if (currentRank < s.previousRank) {
+                        s.trend = "up"; // تقدم للأعلى (مثال: من المركز 4 إلى المركز 2)
+                    } else if (currentRank > s.previousRank) {
+                        s.trend = "down"; // تراجع للخلف
+                    } else {
+                        s.trend = "same"; // استقرار في المركز
+                    }
+
+                    // تحديث الترتيب الحالي في السحاب ليكون جاهزاً للتحديث القادم مجدداً
+                    if (s.previousRank !== currentRank) {
+                        let uRef = db.collection("users_passwords").doc(s.id);
+                        batch.set(uRef, { previousRank: currentRank }, { merge: true });
+                        updatedAny = true;
                     }
                 });
 
-                Object.keys(groupsData).forEach(g => {
-                    totalPoints += computeGroupBonus(g, real, userPreds);
-                });
+                if (updatedAny) {
+                    batch.commit().catch(err => console.error("خطأ أثناء تحديث المراكز السابقة:", err));
+                }
 
-                userObj.points = totalPoints;
+                renderLeaderboard(finalScores);
             });
-
-            // 4. ترتيب الجدول من الأعلى إلى الأسفل (وأصحاب الـ 0 في النهاية)
-            allUsers.sort((a, b) => b.points - a.points);
-            
-            // تمرير البيانات المحدثة لواجهة العرض
-            renderLeaderboard(allUsers);
-            
-        }).catch(err => console.error("Error fetching predictions: ", err));
-    }).catch(err => console.error("Error fetching users: ", err));
+        }).catch(err => console.error(err));
+    }).catch(err => console.error(err));
 }
 
 function renderLeaderboard(scores) {
     const listContainer = document.getElementById("leaderboard-list");
     if (!listContainer) return;
 
-    // 🚫 فلترة إضافية احترازية: استثناء حساب الأدمن حتى لو ظهر بالاسم المعروض (displayName)
     const filteredScores = scores.filter(s => (s.name || "").trim().toLowerCase() !== ADMIN_USERNAME);
 
     listContainer.innerHTML = "";
@@ -689,7 +818,17 @@ function renderLeaderboard(scores) {
         listContainer.innerHTML = `<li class="empty-msg">لا يوجد متسابقون بعد</li>`;
     } else {
         filteredScores.forEach(s => {
-            listContainer.innerHTML += `<li><span>👤 ${escapeHtml(s.name)}</span> <span>${s.points} ن</span></li>`;
+            // 2️⃣ بناء وتعيين أيقونة مؤشر الصعود والهبوط والتحكم بفئاتها الديناميكية في CSS
+            let trendIcon = "▬";
+            let trendClass = "trend-same";
+            if (s.trend === "up") { trendIcon = "▲"; trendClass = "trend-up"; }
+            if (s.trend === "down") { trendIcon = "▼"; trendClass = "trend-down"; }
+
+            listContainer.innerHTML += `
+                <li>
+                    <span><span class="trend ${trendClass}">${trendIcon}</span> 👤 ${escapeHtml(s.name)}</span> 
+                    <span>${s.points} ن</span>
+                </li>`;
         });
     }
 }
