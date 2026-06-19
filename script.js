@@ -276,8 +276,15 @@ function loadData() {
         let realResults = realDoc.exists ? realDoc.data() : {};
         db.collection("worldcup2026").doc(`predict_${currentUser}`).get().then(userDoc => {
             let userPredictions = userDoc.exists ? userDoc.data() : {};
-            renderMatchesLayout(realResults, userPredictions);
-            calculateSystem(realResults, userPredictions);
+
+            // ✅ تعبئة تلقائية للمباريات المنتهية التي لم يتوقعها المستخدم
+            // (سواء لاعب قديم نسي مباراة، أو لاعب جديد انضم بعد بدء البطولة).
+            // تُحفظ في قاعدة بياناته الخاصة بعلامة auto:true لضمان 0 نقطة دائماً،
+            // وتبقى قابلة للتعديل اليدوي من لوحة Firebase فقط (وليس من الواجهة).
+            autoFillMissedPredictions(currentGroup, realResults, userPredictions).then(updatedPredictions => {
+                renderMatchesLayout(realResults, updatedPredictions);
+                calculateSystem(realResults, updatedPredictions);
+            });
         }).catch(err => {
             console.error(err);
             renderMatchesLayout(realResults, {});
@@ -289,6 +296,52 @@ function loadData() {
         calculateSystem({}, {});
     });
     updateLeaderboard();
+}
+
+// =================================================================
+// تعبئة تلقائية لتوقعات المباريات المنتهية التي تركها المستخدم فارغة.
+//
+// السبب: حتى لا تتعطل واجهة وجدول الترتيب الشخصي للمستخدم (لاعب جديد
+// انضم بعد بدء البطولة، أو لاعب قديم نسي مباراة)، نملأ توقعه بنفس
+// النتيجة الحقيقية تلقائياً. لكن هذا التوقع المُعبَّأ تلقائياً يُعلَّم
+// داخلياً بـ auto:true ولا يُحسب له أي نقاط في نظام التحدي (0 نقطة
+// دائماً)، حتى لو تطابقت الأرقام مع النتيجة الحقيقية بالضرورة.
+//
+// التعديل اليدوي: لو أراد المالك تصحيح توقع لاعب نسي بالخطأ، يمكنه
+// فتح Firebase Console مباشرة، وتعديل الحقل a/b لتلك المباراة في
+// مستند `predict_<username>`، وحذف أو تغيير حقل auto إلى false (أو
+// حذفه بالكامل) ليُحسب التوقع بشكل طبيعي مرة أخرى.
+// =================================================================
+function autoFillMissedPredictions(groupKey, realResults, userPredictions) {
+    let toSave = {};
+    let changed = false;
+
+    groupsData[groupKey].matches.forEach(m => {
+        const real = realResults[m.id];
+        const realIsSet = real && isValidScore(real.a) && isValidScore(real.b);
+        if (!realIsSet) return; // المباراة لم تُلعب بعد، لا تعبئة
+
+        const pred = userPredictions[m.id];
+        const predIsSet = pred && isValidScore(pred.a) && isValidScore(pred.b);
+        if (predIsSet) return; // المستخدم توقع هذه المباراة فعلاً، لا تغيير
+
+        // توقع مفقود لمباراة منتهية -> نعبّئه بالنتيجة الحقيقية، معلّماً بـ auto:true
+        userPredictions[m.id] = { a: real.a, b: real.b, auto: true };
+        toSave[m.id] = { a: real.a, b: real.b, auto: true };
+        changed = true;
+    });
+
+    if (!changed || !firebaseReady || !currentUser) {
+        return Promise.resolve(userPredictions);
+    }
+
+    return db.collection("worldcup2026").doc(`predict_${currentUser}`)
+        .set(toSave, { merge: true })
+        .then(() => userPredictions)
+        .catch(err => {
+            console.error("فشل حفظ التعبئة التلقائية:", err);
+            return userPredictions; // نعرضها للمستخدم حتى لو فشل الحفظ، سيُعاد المحاولة لاحقاً
+        });
 }
 
 function renderMatchesLayout(realResults, userPredictions) {
@@ -345,8 +398,13 @@ function isValidScore(value) {
 // 3 نقاط = نتيجة دقيقة طابقت تماماً
 // 1 نقطة = توقع صحيح للفوز/الخسارة/التعادل لكن الأرقام غير دقيقة
 // 0 نقطة = توقع خاطئ تماماً
+//
+// isAuto: إذا كان التوقع مُعبَّأ تلقائياً (لاعب لم يتوقع المباراة فعلاً
+// وتم نسخ النتيجة الحقيقية له تلقائياً)، يُعطى 0 نقطة دائماً ولا يُحسب
+// كتوقع حقيقي، حتى لو تطابقت الأرقام بالضرورة مع النتيجة الحقيقية.
 // =================================================================
-function pointsForPrediction(pa, pb, ra, rb) {
+function pointsForPrediction(pa, pb, ra, rb, isAuto) {
+    if (isAuto) return 0;
     if (pa === ra && pb === rb) return 3;
     const predictedOutcome = pa > pb ? 'A' : (pb > pa ? 'B' : 'D');
     const realOutcome = ra > rb ? 'A' : (rb > ra ? 'B' : 'D');
