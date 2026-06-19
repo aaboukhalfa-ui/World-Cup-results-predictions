@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>دوري توقعات مونديال 2026</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- شاشة تسجيل الدخول (نسخة واحدة فقط، لا يوجد تكرار مع الجافاسكريبت) -->
+    <div id="login-screen" class="modal">
+        <div class="modal-content">
+
+            <div class="how-to-play">
+                <h3>📜 كيف تلعب؟</h3>
+                <ul>
+                    <li>🎯 توقع نتيجة مباراة بدقة (مثلاً 2-1) = <b>3 نقاط</b></li>
+                    <li>✅ توقع الفوز/الخسارة/التعادل بدون دقة الأرقام = <b>1 نقطة</b></li>
+                    <li>❌ توقع خاطئ تماماً = <b>0 نقطة</b></li>
+                    <li>🏆 توقع ترتيب المجموعة بالكامل (1 إلى 4) بشكل صحيح = <b>3 نقاط إضافية</b> لكل مجموعة</li>
+                </ul>
+            </div>
+
+            <h2>🏆 تحدي المونديال</h2>
+
+            <div class="auth-tabs">
+                <button type="button" class="auth-tab active" id="auth-tab-login" onclick="setAuthMode('login')">🔑 حساب موجود</button>
+                <button type="button" class="auth-tab" id="auth-tab-signup" onclick="setAuthMode('signup')">✨ حساب جديد</button>
+            </div>
+
+            <p id="auth-hint">سجّل دخولك بحسابك الحالي: اكتب اسمك وكلمة السر التي استخدمتها سابقاً.</p>
+
+            <input type="text" id="username-input" placeholder="اسم المستخدم (بالعربية أو الإنجليزية)..." maxlength="30">
+            <input type="password" id="password-input" placeholder="كلمة المرور الخاصة بك...">
+            <p id="login-error" class="login-error"></p>
+            <button class="btn" id="login-btn" onclick="loginUser()">دخول 🚀</button>
+        </div>
+    </div>
+
+    <header>
+        <div class="header-top">
+            <h1>🏆 منصة تحدي مونديال 2026</h1>
+            <button class="logout-btn" id="logout-btn" onclick="logoutUser()">🚪 تسجيل خروج</button>
+        </div>
+        <p id="welcome-msg">مرحباً بك!</p>
+    </header>
+
+    <div class="groups-tabs-container">
+        <ul class="groups-tabs" id="groups-nav"></ul>
+    </div>
+
+    <div class="mode-control">
+        <button class="mode-btn active" id="btn-predict-mode" onclick="setMode('predict')">🔮 وضع توقعاتي</button>
+        <button class="mode-btn" id="btn-real-mode" onclick="setMode('real')">👑 إدخال النتائج الحقيقية (للمالك)</button>
+    </div>
+
+    <div class="main-layout">
+
+        <aside class="sidebar card">
+            <h2>🔥 جدول المتصدرين (كل المجموعات)</h2>
+            <ul id="leaderboard-list"></ul>
+        </aside>
+
+        <main class="content-area card">
+            <h2 id="current-group-title">⚽ مباريات المجموعة</h2>
+
+            <div id="groups-view">
+                <div id="matches-list"></div>
+                <button class="btn" id="save-btn" onclick="saveDataToCloud()">حفظ وقفل التوقعات 💾</button>
+
+                <h2 style="margin-top: 30px;">📊 جدول الترتيب والمقارنة</h2>
+                <div class="stats-badge" id="accuracy-badge">🎯 نقاط تحدي التوقعات في هذه المجموعة: 0 نقطة</div>
+                <div class="stats-badge bonus-badge" id="group-bonus-badge" style="display:none;"></div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>المركز</th>
+                            <th>المنتخب</th>
+                            <th>لعب</th>
+                            <th>نقاط متوقعة</th>
+                            <th>نقاط حقيقية</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body"></tbody>
+                </table>
+            </div>
+
+            <div id="knockout-view" class="knockout-placeholder" style="display:none;">
+                <div class="knockout-icon">🏆</div>
+                <h3>مرحلة خروج المغلوب (Knockout Stage)</h3>
+                <p class="knockout-msg">غير متاح حالياً</p>
+                <p class="knockout-sub">سيتم تفعيل هذه المرحلة بعد انتهاء دور المجموعات</p>
+            </div>
+        </main>
+
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <script src="script.js"></script>
+</body>
+</html>
