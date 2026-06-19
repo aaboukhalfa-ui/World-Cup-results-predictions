@@ -620,6 +620,9 @@ function calculateSystem(realResults, userPredictions) {
     }
 }
 
+// اسم المستخدم الخاص بحساب المالك/الأدمن - يُستثنى دائماً من جدول المتصدرين
+const ADMIN_USERNAME = "boukhalfa anes";
+
 // خريطة سريعة: id المباراة -> رمز المجموعة (مستخدمة لحساب نقاط المتصدرين)
 const matchIdToGroup = {};
 Object.keys(groupsData).forEach(g => {
@@ -637,6 +640,10 @@ function updateLeaderboard() {
             querySnapshot.forEach(doc => {
                 if (doc.id.startsWith("predict_")) {
                     let user = doc.id.replace("predict_", "");
+
+                    // 🚫 استثناء حساب المالك/الأدمن من جدول المتصدرين
+                    if (user.toLowerCase() === ADMIN_USERNAME) return;
+
                     let userPreds = doc.data();
                     let totalPoints = 0;
 
@@ -686,11 +693,15 @@ function updateLeaderboard() {
 function renderLeaderboard(scores) {
     const listContainer = document.getElementById("leaderboard-list");
     if (!listContainer) return;
+
+    // 🚫 فلترة إضافية احترازية: استثناء حساب الأدمن حتى لو ظهر بالاسم المعروض (displayName)
+    const filteredScores = scores.filter(s => (s.name || "").trim().toLowerCase() !== ADMIN_USERNAME);
+
     listContainer.innerHTML = "";
-    if (scores.length === 0) {
+    if (filteredScores.length === 0) {
         listContainer.innerHTML = `<li class="empty-msg">لا يوجد متسابقون بعد</li>`;
     } else {
-        scores.forEach(s => {
+        filteredScores.forEach(s => {
             listContainer.innerHTML += `<li><span>👤 ${escapeHtml(s.name)}</span> <span>${s.points} ن</span></li>`;
         });
     }
