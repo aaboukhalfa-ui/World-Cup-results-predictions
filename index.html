@@ -17,7 +17,7 @@
                     <li>🎯 توقع نتيجة مباراة بدقة (مثلاً 2-1) = <b>3 نقاط</b></li>
                     <li>✅ توقع الفوز/الخسارة/التعادل بدون دقة الأرقام = <b>1 نقطة</b></li>
                     <li>❌ توقع خاطئ تماماً = <b>0 نقطة</b></li>
-                    <li>🃏 <b>مباراة الجوكر:</b> يمكنك تفعيل جوكر واحد لكل مجموعة لمضاعفة نقاط تلك المباراة!</li>
+                    <li>🃏 <b>مباراة الجوكر:</b> اختر مباراة واحدة لكل مجموعة لمضاعفة نقاطها! 🔥</li>
                     <li>🏆 توقع ترتيب المجموعة بالكامل (1 إلى 4) بشكل صحيح = <b>3 نقاط إضافية</b> لكل مجموعة</li>
                 </ul>
             </div>
@@ -46,13 +46,23 @@
         <p id="welcome-msg">مرحباً بك!</p>
     </header>
 
+    <div id="global-lock-banner" class="lock-banner" style="display: none;">
+        ⚠️ تم إغلاق استقبال التوقعات حالياً من قبل المسؤول (Predictions are locked by Admin)
+    </div>
+
+    <div id="admin-lock-control" class="card admin-lock-box" style="display: none; margin-bottom: 20px; text-align: center;">
+        <h3>🛠️ لوحة التحكم العامة للمسؤول</h3>
+        <p id="admin-lock-status"></p>
+        <button id="admin-lock-toggle-btn" onclick="toggleGlobalLock()"></button>
+    </div>
+
     <div class="groups-tabs-container">
         <ul class="groups-tabs" id="groups-nav"></ul>
     </div>
 
     <div class="mode-control">
         <button class="mode-btn active" id="btn-predict-mode" onclick="setMode('predict')">🔮 وضع توقعاتي</button>
-        <button class="mode-btn" id="btn-real-mode" onclick="setMode('real')">👑 إدخال النتائج الحقيقية (للمالك)</button>
+        <button class="mode-btn" id="btn-real-mode" onclick="setMode('real')">👑 إدخل النتائج الحقيقية (للمالك)</button>
     </div>
 
     <div class="main-layout">
@@ -69,7 +79,7 @@
                 <div id="matches-list"></div>
                 <button class="btn" id="save-btn" onclick="saveDataToCloud()">حفظ وقفل التوقعات 💾</button>
 
-                <h2 style="margin-top: 30px;">📊 جدول التعتيم والمقارنة</h2>
+                <h2 style="margin-top: 30px;">📊 جدول الترتيب والمقارنة</h2>
                 <div class="stats-badge" id="accuracy-badge">🎯 نقاط تحدي التوقعات في هذه المجموعة: 0 نقطة</div>
                 <div class="stats-badge bonus-badge" id="group-bonus-badge" style="display:none;"></div>
                 <table>
