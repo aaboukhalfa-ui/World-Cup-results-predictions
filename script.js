@@ -129,15 +129,21 @@ document.addEventListener("DOMContentLoaded", () => {
             li.textContent = `المجموعة ${g}`;
             li.id = `tab-${g}`;
             if (g === 'A') li.className = 'active-tab';
-            li.onclick = () => switchGroup(g);
+            li.onclick = () => switchGroupOrPredictions(g);
             nav.appendChild(li);
         });
 
         let knockoutTab = document.createElement('li');
         knockoutTab.textContent = `🏆 خروج المغلوب`;
         knockoutTab.id = `tab-knockout`;
-        knockoutTab.onclick = () => switchToKnockout();
+        knockoutTab.onclick = () => switchToKnockoutFromAnyView();
         nav.appendChild(knockoutTab);
+
+        let predictionsTab = document.createElement('li');
+        predictionsTab.textContent = `📋 توقعات اللاعبين`;
+        predictionsTab.id = `tab-predictions`;
+        predictionsTab.onclick = () => switchToPredictionsView();
+        nav.appendChild(predictionsTab);
     }
 
     if (currentUser) showApp();
@@ -149,6 +155,13 @@ document.addEventListener("DOMContentLoaded", () => {
             if (e.key === "Enter") loginUser();
         });
     }
+
+    // إضافة غير مدمرة: الخروج من صفحة "توقعات اللاعبين" تلقائياً عند الضغط
+    // على أزرار "وضع توقعاتي" أو "إدخال النتائج الحقيقية" (بدون تعديل setMode نفسها)
+    const predictModeBtn = document.getElementById('btn-predict-mode');
+    if (predictModeBtn) predictModeBtn.addEventListener('click', exitPredictionsViewIfActive);
+    const realModeBtn = document.getElementById('btn-real-mode');
+    if (realModeBtn) realModeBtn.addEventListener('click', exitPredictionsViewIfActive);
 });
 
 function switchGroup(g) {
@@ -174,6 +187,179 @@ function switchToKnockout() {
     document.getElementById('current-group-title').textContent = `🏆 مرحلة خروج المغلوب`;
     document.getElementById('groups-view').style.display = "none";
     document.getElementById('knockout-view').style.display = "block";
+}
+
+// =================================================================
+// 📋 صفحة عرض توقعات جميع اللاعبين لكل مباراة مجموعة منتهية
+// (ميزة جديدة: لا تُعدّل أي دالة موجودة سابقاً، بل تُضاف بجانبها)
+// =================================================================
+let isPredictionsViewActive = false; // علم يحدد إن كنا داخل صفحة "توقعات اللاعبين"
+
+// عند الضغط على تبويب مجموعة (A..L): إذا كنا في صفحة توقعات اللاعبين نبقى فيها
+// ونعرض توقعات تلك المجموعة، وإلا فالسلوك الطبيعي القديم (switchGroup) يبقى كما هو
+function switchGroupOrPredictions(g) {
+    if (isPredictionsViewActive) {
+        renderGroupSelectionForPredictions(g);
+    } else {
+        switchGroup(g);
+    }
+}
+
+// يضمن إخفاء صفحة "توقعات اللاعبين" وإعادة الزر العادي للحالة الطبيعية
+// عند الخروج منها إلى مجموعة عادية (يُستخدم فقط داخلياً قبل استدعاء switchGroup الأصلية)
+function exitPredictionsViewIfActive() {
+    if (isPredictionsViewActive) {
+        isPredictionsViewActive = false;
+        const predTab = document.getElementById('tab-predictions');
+        if (predTab) predTab.classList.remove('active-tab');
+        document.getElementById('predictions-view').style.display = "none";
+        document.getElementById('groups-view').style.display = "block"; // إعادة إظهار شاشة المباريات العادية
+        const newTab = document.getElementById(`tab-${currentGroup}`);
+        if (newTab) newTab.className = 'active-tab';
+        document.getElementById('current-group-title').textContent = `⚽ مباريات ${groupsData[currentGroup].name}`;
+    }
+}
+
+function switchToKnockoutFromAnyView() {
+    exitPredictionsViewIfActive();
+    switchToKnockout();
+}
+
+function switchToPredictionsView() {
+    const oldTab = document.getElementById(`tab-${currentGroup === 'knockout' ? 'knockout' : currentGroup}`);
+    if (oldTab) oldTab.classList.remove('active-tab');
+
+    isPredictionsViewActive = true;
+    document.getElementById('tab-predictions').className = 'active-tab';
+
+    document.getElementById('current-group-title').textContent = `📋 توقعات اللاعبين`;
+    document.getElementById('groups-view').style.display = "none";
+    document.getElementById('knockout-view').style.display = "none";
+    document.getElementById('predictions-view').style.display = "block";
+
+    // نعرض افتراضياً توقعات المجموعة الحالية (أو A إذا لم تكن محددة)
+    renderGroupSelectionForPredictions(currentGroup === 'knockout' ? 'A' : currentGroup);
+}
+
+function renderGroupSelectionForPredictions(g) {
+    Object.keys(groupsData).forEach(key => {
+        const tab = document.getElementById(`tab-${key}`);
+        if (tab) tab.classList.toggle('active-tab', key === g);
+    });
+    const knockoutTab = document.getElementById('tab-knockout');
+    if (knockoutTab) knockoutTab.classList.remove('active-tab');
+
+    currentGroup = g;
+    document.getElementById('current-group-title').textContent = `📋 توقعات اللاعبين - ${groupsData[g].name}`;
+    loadAllPredictionsForGroup(g);
+}
+
+// جلب النتائج الحقيقية وكل توقعات المستخدمين المسجَّلين، ثم عرض المباريات
+// المنتهية فقط (التي أدخل المالك نتيجتها الحقيقية)
+function loadAllPredictionsForGroup(g) {
+    const container = document.getElementById('predictions-list');
+    if (!container || !firebaseReady) return;
+    container.innerHTML = `<p class="pred-empty-msg">⏳ جاري تحميل التوقعات...</p>`;
+
+    db.collection("worldcup2026").doc("real_results").get().then(realDoc => {
+        let real = realDoc.exists ? realDoc.data() : {};
+
+        // المباريات المنتهية فقط في هذه المجموعة (نتيجة حقيقية صالحة مُدخلة)
+        let finishedMatches = groupsData[g].matches.filter(m => {
+            const r = real[m.id];
+            return r && isValidScore(r.a) && isValidScore(r.b);
+        });
+
+        if (finishedMatches.length === 0) {
+            container.innerHTML = `<p class="pred-empty-msg">⌛ لا توجد مباريات منتهية بعد في هذه المجموعة. ستظهر توقعات اللاعبين هنا فور إدخال المالك للنتائج الحقيقية.</p>`;
+            return;
+        }
+
+        // كل المستخدمين المسجَّلين (لعرض اسمهم اللائق، وأيضاً لتضمين من لم يتوقع حتى لو لم يحفظ شيئاً)
+        db.collection("users_passwords").get().then(usersSnap => {
+            let registeredUsers = [];
+            usersSnap.forEach(udoc => {
+                let username = udoc.id;
+                if (username.toLowerCase() === ADMIN_USERNAME) return; // 🚫 نفس قاعدة استثناء الأدمن المعتمدة في باقي التطبيق
+                registeredUsers.push({ user: username, displayName: udoc.data().displayName || username });
+            });
+
+            db.collection("worldcup2026").get().then(allDocsSnap => {
+                let predictionsByUser = {};
+                allDocsSnap.forEach(doc => {
+                    if (doc.id.startsWith("predict_")) {
+                        predictionsByUser[doc.id.replace("predict_", "")] = doc.data();
+                    }
+                });
+
+                renderPredictionsList(finishedMatches, real, registeredUsers, predictionsByUser);
+            }).catch(err => {
+                console.error(err);
+                container.innerHTML = `<p class="pred-empty-msg">❌ تعذر تحميل توقعات اللاعبين.</p>`;
+            });
+        }).catch(err => {
+            console.error(err);
+            container.innerHTML = `<p class="pred-empty-msg">❌ تعذر تحميل قائمة اللاعبين المسجَّلين.</p>`;
+        });
+    }).catch(err => {
+        console.error(err);
+        container.innerHTML = `<p class="pred-empty-msg">❌ تعذر تحميل النتائج الحقيقية.</p>`;
+    });
+}
+
+function renderPredictionsList(finishedMatches, real, registeredUsers, predictionsByUser) {
+    const container = document.getElementById('predictions-list');
+    if (!container) return;
+
+    let html = "";
+    finishedMatches.forEach(m => {
+        const r = real[m.id];
+        const ra = parseInt(r.a, 10), rb = parseInt(r.b, 10);
+
+        html += `<div class="pred-match-card">
+            <div class="pred-match-header">
+                <span class="pred-match-teams">${escapeHtml(m.tA)} ضد ${escapeHtml(m.tB)}</span>
+                <span class="pred-match-result">النتيجة الحقيقية: ${ra} - ${rb}</span>
+            </div>
+            <div class="pred-rows">`;
+
+        // نرتب اللاعبين أبجدياً بالاسم اللائق لتسهيل القراءة
+        let sortedUsers = [...registeredUsers].sort((a, b) => a.displayName.localeCompare(b.displayName, 'ar'));
+
+        sortedUsers.forEach(ru => {
+            const userPreds = predictionsByUser[ru.user] || {};
+            const p = userPreds[m.id];
+            const predictionExists = p && isValidScore(p.a) && isValidScore(p.b);
+
+            if (!predictionExists) {
+                html += `<div class="pred-row">
+                    <span class="pred-user">👤 ${escapeHtml(ru.displayName)}</span>
+                    <span class="pred-no-prediction">لم يتوقع هذه المباراة</span>
+                </div>`;
+                return;
+            }
+
+            const pa = parseInt(p.a, 10), pb = parseInt(p.b, 10);
+            const pts = pointsForPrediction(pa, pb, ra, rb, p.auto, p.isJoker);
+            const ptsClass = pts >= 3 ? 'pred-points-3' : (pts >= 1 ? 'pred-points-1' : 'pred-points-0');
+            const jokerTag = p.isJoker ? `<span class="pred-joker-tag" title="مباراة الجوكر">🃏</span>` : "";
+            const autoTag = p.auto ? `<span class="pred-no-prediction" style="margin-right:6px;">(تلقائي)</span>` : "";
+
+            html += `<div class="pred-row">
+                <span class="pred-user">👤 ${escapeHtml(ru.displayName)}</span>
+                <span>
+                    ${autoTag}
+                    ${jokerTag}
+                    <span class="pred-score">${pa} - ${pb}</span>
+                    <span class="pred-points-tag ${ptsClass}">${pts} ن</span>
+                </span>
+            </div>`;
+        });
+
+        html += `</div></div>`;
+    });
+
+    container.innerHTML = html;
 }
 
 function showApp() {
