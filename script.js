@@ -60,6 +60,79 @@ const groupsData = {
 };
 
 // =================================================================
+// 🏆 بيانات مرحلة خروج المغلوب (دور الـ32 وحتى النهائي)
+// المباريات الـ16 الأولى ثابتة كما في الصورة الرسمية. كل مباراة لاحقة
+// (دور الـ16 فصاعداً) تُعبَّأ تلقائياً بالفريقين الفائزين من المباراتين
+// السابقتين لها بمجرد إدخال نتيجتيهما (يدوياً من المالك أو من توقع اللاعب).
+// =================================================================
+const knockoutData = {
+    round32: {
+        name: "دور الـ32", date: "29 يونيو",
+        matches: [
+            { id: "R32-1",  tA: "البرازيل 🇧🇷",        tB: "اليابان 🇯🇵",        side: "left"  },
+            { id: "R32-2",  tA: "كوت ديفوار 🇨🇮",       tB: "النرويج 🇳🇴",        side: "left"  },
+            { id: "R32-3",  tA: "المكسيك 🇲🇽",          tB: "الإكوادور 🇪🇨",       side: "left"  },
+            { id: "R32-4",  tA: "إنجلترا 🏴",           tB: "الكونغو الديمقراطية 🇨🇩", side: "left"  },
+            { id: "R32-5",  tA: "الأرجنتين 🇦🇷",         tB: "الأوروغواي 🇺🇾",      side: "left"  },
+            { id: "R32-6",  tA: "أستراليا 🇦🇺",         tB: "مصر 🇪🇬",            side: "left"  },
+            { id: "R32-7",  tA: "سويسرا 🇨🇭",           tB: "الجزائر 🇩🇿",        side: "left"  },
+            { id: "R32-8",  tA: "كولومبيا 🇨🇴",         tB: "غانا 🇬🇭",           side: "left"  },
+            { id: "R32-9",  tA: "ألمانيا 🇩🇪",          tB: "إيران 🇮🇷",          side: "right" },
+            { id: "R32-10", tA: "فرنسا 🇫🇷",            tB: "السويد 🇸🇪",         side: "right" },
+            { id: "R32-11", tA: "جنوب إفريقيا 🇿🇦",      tB: "كندا 🇨🇦",           side: "right" },
+            { id: "R32-12", tA: "هولندا 🇳🇱",           tB: "المغرب 🇲🇦",         side: "right" },
+            { id: "R32-13", tA: "البرتغال 🇵🇹",         tB: "كرواتيا 🇭🇷",        side: "right" },
+            { id: "R32-14", tA: "إسبانيا 🇪🇸",          tB: "النمسا 🇦🇹",         side: "right" },
+            { id: "R32-15", tA: "الولايات المتحدة 🇺🇸",  tB: "البوسنة والهرسك 🇧🇦",  side: "right" },
+            { id: "R32-16", tA: "بلجيكا 🇧🇪",           tB: "السنغال 🇸🇳",        side: "right" }
+        ]
+    },
+    round16: {
+        name: "دور الـ16", date: "5 يوليو",
+        matches: [
+            { id: "R16-1", from: ["R32-1", "R32-2"],  side: "left"  },
+            { id: "R16-2", from: ["R32-3", "R32-4"],  side: "left"  },
+            { id: "R16-3", from: ["R32-5", "R32-6"],  side: "left"  },
+            { id: "R16-4", from: ["R32-7", "R32-8"],  side: "left"  },
+            { id: "R16-5", from: ["R32-9", "R32-10"], side: "right" },
+            { id: "R16-6", from: ["R32-11", "R32-12"],side: "right" },
+            { id: "R16-7", from: ["R32-13", "R32-14"],side: "right" },
+            { id: "R16-8", from: ["R32-15", "R32-16"],side: "right" }
+        ]
+    },
+    quarter: {
+        name: "ربع النهائي", date: "9-12 يوليو",
+        matches: [
+            { id: "QF-1", from: ["R16-1", "R16-2"], side: "left",  date: "12 يوليو" },
+            { id: "QF-2", from: ["R16-3", "R16-4"], side: "left",  date: "12 يوليو" },
+            { id: "QF-3", from: ["R16-5", "R16-6"], side: "right", date: "9 يوليو"  },
+            { id: "QF-4", from: ["R16-7", "R16-8"], side: "right", date: "10 يوليو" }
+        ]
+    },
+    semi: {
+        name: "نصف النهائي", date: "14-15 يوليو",
+        matches: [
+            { id: "SF-1", from: ["QF-1", "QF-2"], side: "left",  date: "15 يوليو" },
+            { id: "SF-2", from: ["QF-3", "QF-4"], side: "right", date: "14 يوليو" }
+        ]
+    },
+    final: {
+        name: "النهائي", date: "19 يوليو",
+        matches: [
+            { id: "FINAL", from: ["SF-1", "SF-2"], side: "center" }
+        ]
+    }
+};
+
+const knockoutRoundOrder = ["round32", "round16", "quarter", "semi", "final"];
+
+// خريطة سريعة: id المباراة -> الجولة التي تنتمي إليها
+const knockoutMatchToRound = {};
+knockoutRoundOrder.forEach(rk => {
+    knockoutData[rk].matches.forEach(m => { knockoutMatchToRound[m.id] = rk; });
+});
+
+// =================================================================
 // وظيفة الإدارة: تغيير اسم عرض اللاعب (Moderation)
 // =================================================================
 function renameUserByAdmin() {
@@ -184,9 +257,11 @@ function switchToKnockout() {
     currentGroup = 'knockout';
     document.getElementById('tab-knockout').className = 'active-tab';
 
-    document.getElementById('current-group-title').textContent = `🏆 مرحلة خروج المغلوب`;
+    document.getElementById('current-group-title').textContent = `🏆 مرحلة خروج المغلوب - الطريق إلى النهائي`;
     document.getElementById('groups-view').style.display = "none";
     document.getElementById('knockout-view').style.display = "block";
+
+    loadKnockoutData();
 }
 
 // =================================================================
@@ -486,7 +561,15 @@ function setMode(mode) {
 
     const saveBtn = document.getElementById('save-btn');
     if (saveBtn) saveBtn.textContent = mode === 'real' ? "💾 حفظ النتائج الحقيقية" : "حفظ التوقعات 💾";
-    loadData();
+
+    const koSaveBtn = document.getElementById('ko-save-btn');
+    if (koSaveBtn) koSaveBtn.textContent = mode === 'real' ? "💾 حفظ نتائج خروج المغلوب" : "حفظ توقعاتي 💾";
+
+    if (currentGroup === 'knockout') {
+        loadKnockoutData();
+    } else {
+        loadData();
+    }
 }
 
 function loadData() {
@@ -689,6 +772,346 @@ function computeGroupBonus(groupKey, realResults, userPredictions) {
     return exactMatch ? 3 : 0;
 }
 
+// =================================================================
+// 🏆 مرحلة خروج المغلوب - المنطق الكامل
+//
+// كل مباراة في resultsObj مخزَّنة بالشكل:
+// { a: "2", b: "1", penaltyWinner: "A" أو "B" أو "" , isLocked: bool }
+// - a/b: نتيجة الوقت الأصلي (90 دقيقة). يمكن أن تكون متعادلة.
+// - penaltyWinner: تُستخدم فقط إذا كانت النتيجة متعادلة، وتحدد الفائز
+//   بركلات الترجيح ("A" يعني الفريق الأول tA، "B" يعني الفريق الثاني tB).
+// =================================================================
+
+function getKnockoutMatchById(matchId) {
+    const rk = knockoutMatchToRound[matchId];
+    if (!rk) return null;
+    return knockoutData[rk].matches.find(m => m.id === matchId) || null;
+}
+
+// يحدد اسم الفريق الذي يجب أن يظهر في خانة tA أو tB لمباراة معيّنة.
+// إذا كانت المباراة من الدور الأول (R32) فالاسم ثابت، وإلا فهو الفائز
+// من المباراة السابقة المرتبطة بـ from[0]/from[1] بحسب resultsObj.
+function resolveSlotTeam(match, slotIndex, resultsObj) {
+    if (match.tA !== undefined && slotIndex === 0) return match.tA;
+    if (match.tB !== undefined && slotIndex === 1) return match.tB;
+    if (!match.from) return null;
+
+    const prevMatchId = match.from[slotIndex];
+    const prevMatch = getKnockoutMatchById(prevMatchId);
+    if (!prevMatch) return null;
+
+    const winner = computeKnockoutWinner(prevMatch, resultsObj);
+    return winner ? winner.team : `(فائز ${prevMatch.id})`;
+}
+
+// يحسب الفائز من مباراة معيّنة بناءً على نتيجة محفوظة (حقيقية أو توقع).
+// يعيد { team: "اسم الفريق", slot: 'A' أو 'B' } أو null إن لم تُحسم بعد.
+function computeKnockoutWinner(match, resultsObj) {
+    const res = resultsObj[match.id];
+    if (!res || !isValidScore(res.a) || !isValidScore(res.b)) return null;
+
+    const teamA = resolveSlotTeam(match, 0, resultsObj);
+    const teamB = resolveSlotTeam(match, 1, resultsObj);
+    if (!teamA || !teamB) return null;
+
+    const a = parseInt(res.a, 10), b = parseInt(res.b, 10);
+    if (a > b) return { team: teamA, slot: 'A' };
+    if (b > a) return { team: teamB, slot: 'B' };
+
+    // تعادل في الوقت الأصلي -> يُحدد الفائز بركلات الترجيح
+    if (res.penaltyWinner === 'A') return { team: teamA, slot: 'A' };
+    if (res.penaltyWinner === 'B') return { team: teamB, slot: 'B' };
+    return null; // متعادل ولم يُحدَّد فائز الترجيح بعد
+}
+
+// نقاط توقع مباراة خروج المغلوب الواحدة (نفس قاعدة 3/1/0 + مكافأة ركلات الترجيح)
+// realRes/predRes بالشكل {a,b,penaltyWinner}
+function pointsForKnockoutPrediction(predRes, realRes) {
+    if (!predRes || !isValidScore(predRes.a) || !isValidScore(predRes.b)) return 0;
+    if (!realRes || !isValidScore(realRes.a) || !isValidScore(realRes.b)) return 0;
+
+    const pa = parseInt(predRes.a, 10), pb = parseInt(predRes.b, 10);
+    const ra = parseInt(realRes.a, 10), rb = parseInt(realRes.b, 10);
+
+    let points = 0;
+    if (pa === ra && pb === rb) points = 3;
+    else {
+        const predOutcome = pa > pb ? 'A' : (pb > pa ? 'B' : 'D');
+        const realOutcome = ra > rb ? 'A' : (rb > ra ? 'B' : 'D');
+        points = (predOutcome === realOutcome) ? 1 : 0;
+    }
+
+    // مكافأة ركلات الترجيح: فقط إذا كانت النتيجة الحقيقية متعادلة (ذهبت لركلات الترجيح)
+    const realWasDraw = (ra === rb);
+    if (realWasDraw && realRes.penaltyWinner && predRes.penaltyWinner) {
+        if (predRes.penaltyWinner === realRes.penaltyWinner) points += 2;
+    }
+
+    return points;
+}
+
+// =================================================================
+// جلب نتائج خروج المغلوب الحقيقية وتوقعات المستخدم وعرض القوسين
+// =================================================================
+function loadKnockoutData() {
+    const container = document.getElementById('knockout-bracket-container');
+    if (!container || !firebaseReady) return;
+
+    db.collection("worldcup2026").doc("knockout_real").get().then(realDoc => {
+        let realResults = realDoc.exists ? realDoc.data() : {};
+        db.collection("worldcup2026").doc(`knockout_predict_${currentUser}`).get().then(userDoc => {
+            let userPredictions = userDoc.exists ? userDoc.data() : {};
+            renderKnockoutBracket(realResults, userPredictions);
+            renderKnockoutBadge(realResults, userPredictions);
+        }).catch(() => {
+            renderKnockoutBracket(realResults, {});
+        });
+    }).catch(err => {
+        console.error(err);
+        container.innerHTML = `<p class="pred-empty-msg">❌ تعذر تحميل بيانات خروج المغلوب.</p>`;
+    });
+}
+
+function renderKnockoutBadge(realResults, userPredictions) {
+    const badge = document.getElementById('knockout-accuracy-badge');
+    if (!badge) return;
+    if (currentMode === 'real') {
+        badge.textContent = `👑 أنت في وضع إدخال النتائج الحقيقية لمرحلة خروج المغلوب`;
+        return;
+    }
+    let total = 0;
+    knockoutRoundOrder.forEach(rk => {
+        knockoutData[rk].matches.forEach(m => {
+            total += pointsForKnockoutPrediction(userPredictions[m.id], realResults[m.id]);
+        });
+    });
+    badge.textContent = `🎯 نقاط تحدي خروج المغلوب الخاصة بك: ${total} نقطة`;
+}
+
+// يبني صندوق مباراة واحدة (HTML) لكل من العرض اليساري/الأيمن/المركزي
+function renderKnockoutMatchBox(match, realResults, userPredictions) {
+    const teamA = resolveSlotTeam(match, 0, realResults);
+    const teamB = resolveSlotTeam(match, 1, realResults);
+    const teamAKnown = teamA && !teamA.startsWith("(فائز");
+    const teamBKnown = teamB && !teamB.startsWith("(فائز");
+
+    const realRes = realResults[match.id] || { a: "", b: "", penaltyWinner: "" };
+    const predRes = userPredictions[match.id] || { a: "", b: "", penaltyWinner: "" };
+
+    const isRealExist = isValidScore(realRes.a) && isValidScore(realRes.b);
+    const isManualLocked = realRes.isLocked === true;
+    const saved = currentMode === 'real' ? realRes : predRes;
+
+    // لا يمكن إدخال أي نتيجة قبل تحديد الفريقين المتأهلين فعلاً
+    const slotsReady = teamAKnown && teamBKnown;
+    let isDisabled = (!slotsReady) ? "disabled" : "";
+    if (currentMode === 'predict' && (isRealExist || isManualLocked)) isDisabled = "disabled";
+
+    // التعادل في النتيجة المعروضة -> نحتاج خانة اختيار الفائز بركلات الترجيح
+    const showsDraw = isValidScore(saved.a) && isValidScore(saved.b) && parseInt(saved.a,10) === parseInt(saved.b,10);
+
+    let lockNote = "";
+    let adminLockBtn = "";
+    if (currentMode === 'real') {
+        if (isRealExist) lockNote = `<span class="match-locked-note" style="color:var(--text-muted);">🔒 النتيجة محفوظة</span>`;
+        if (slotsReady) {
+            let lockText = isManualLocked ? "🔓 افتح المباراة" : "🔒 اقفل المباراة";
+            let lockClass = isManualLocked ? "locked" : "unlocked";
+            adminLockBtn = `<button class="admin-lock-btn ${lockClass}" onclick="toggleKnockoutMatchLock('${match.id}', ${isManualLocked})">${lockText}</button>`;
+        }
+    } else {
+        if (isRealExist) lockNote = `<span class="match-locked-note">🔒 انتهت المباراة - التوقع مقفل</span>`;
+        else if (isManualLocked) lockNote = `<span class="match-locked-note" style="color:var(--danger);font-weight:bold;">🔒 مغلقة</span>`;
+        else if (!slotsReady) lockNote = `<span class="match-locked-note" style="color:var(--text-muted);">⏳ بانتظار تحديد الفريقين</span>`;
+    }
+
+    let penaltyBox = "";
+    if (slotsReady && showsDraw) {
+        const pwA = saved.penaltyWinner === 'A' ? 'selected' : '';
+        const pwB = saved.penaltyWinner === 'B' ? 'selected' : '';
+        penaltyBox = `
+            <div class="penalty-box">
+                <span class="penalty-label">⚽ الفائز بركلات الترجيح:</span>
+                <button type="button" class="penalty-pick-btn ${pwA}" ${isDisabled} onclick="setPenaltyWinner('${match.id}','A')">${escapeHtml(teamA)}</button>
+                <button type="button" class="penalty-pick-btn ${pwB}" ${isDisabled} onclick="setPenaltyWinner('${match.id}','B')">${escapeHtml(teamB)}</button>
+            </div>`;
+    }
+
+    const displayTeamA = teamAKnown ? escapeHtml(teamA) : `<span class="tbd-team">${escapeHtml(teamA || '؟')}</span>`;
+    const displayTeamB = teamBKnown ? escapeHtml(teamB) : `<span class="tbd-team">${escapeHtml(teamB || '؟')}</span>`;
+
+    return `
+        <div class="ko-match-box" data-match-id="${match.id}">
+            <div class="ko-match-date">${match.date ? '📅 ' + match.date : ''}</div>
+            <div class="ko-team-row">
+                <span class="ko-team-name">${displayTeamA}</span>
+                <input type="number" min="0" step="1" ${isDisabled} class="score-input ko-score-input" id="ko-inputA-${match.id}" value="${saved.a !== undefined ? saved.a : ''}" onchange="handleKnockoutScoreChange('${match.id}')">
+            </div>
+            <div class="ko-vs-sep">vs</div>
+            <div class="ko-team-row">
+                <span class="ko-team-name">${displayTeamB}</span>
+                <input type="number" min="0" step="1" ${isDisabled} class="score-input ko-score-input" id="ko-inputB-${match.id}" value="${saved.b !== undefined ? saved.b : ''}" onchange="handleKnockoutScoreChange('${match.id}')">
+            </div>
+            ${penaltyBox}
+            ${lockNote}
+            ${adminLockBtn}
+        </div>
+    `;
+}
+
+// عند تغيير نتيجة مباراة، نعيد الرسم لتحديث ظهور/اختفاء صندوق ركلات
+// الترجيح وتحديث أسماء الفرق في الجولة التالية مباشرة (بدون إعادة تحميل من Firebase)
+function handleKnockoutScoreChange(matchId) {
+    renderKnockoutBracketFromCurrentInputs();
+}
+
+function setPenaltyWinner(matchId, slot) {
+    const btns = document.querySelectorAll(`.ko-match-box[data-match-id="${matchId}"] .penalty-pick-btn`);
+    btns.forEach((b, i) => b.classList.toggle('selected', (i === 0 && slot === 'A') || (i === 1 && slot === 'B')));
+    knockoutPendingPenalties[matchId] = slot;
+}
+
+let knockoutPendingPenalties = {}; // اختيارات ركلات الترجيح غير المحفوظة بعد، بالذاكرة فقط حتى الحفظ
+
+// إعادة قراءة كل صناديق الإدخال الحالية على الشاشة وإعادة بناء الترتيب
+// (يُستخدم بعد كل تغيير لتحديث تأهل الفرق للجولة التالية فوراً في الواجهة)
+function renderKnockoutBracketFromCurrentInputs() {
+    let liveResults = {};
+    knockoutRoundOrder.forEach(rk => {
+        knockoutData[rk].matches.forEach(m => {
+            const inputA = document.getElementById(`ko-inputA-${m.id}`);
+            const inputB = document.getElementById(`ko-inputB-${m.id}`);
+            if (inputA && inputB) {
+                liveResults[m.id] = {
+                    a: inputA.value.trim(),
+                    b: inputB.value.trim(),
+                    penaltyWinner: knockoutPendingPenalties[m.id] || ""
+                };
+            }
+        });
+    });
+    renderKnockoutBracket(liveResults, currentMode === 'predict' ? liveResults : {}, true);
+}
+
+// يبني عمود كامل (يسار أو يمين) يحتوي كل الجولات من R32 حتى نصف النهائي
+function buildKnockoutColumnHtml(side, realResults, userPredictions) {
+    let html = "";
+    ["round32", "round16", "quarter", "semi"].forEach(rk => {
+        const roundMatches = knockoutData[rk].matches.filter(m => m.side === side);
+        if (roundMatches.length === 0) return;
+        html += `<div class="ko-round-column">`;
+        html += `<div class="ko-round-title">${knockoutData[rk].name}</div>`;
+        roundMatches.forEach(m => {
+            const data = currentMode === 'real' ? realResults : userPredictions;
+            html += renderKnockoutMatchBox(m, realResults, data);
+        });
+        html += `</div>`;
+    });
+    return html;
+}
+
+function renderKnockoutBracket(realResults, userPredictions, skipBadge) {
+    const leftCol = document.getElementById('knockout-left-col');
+    const rightCol = document.getElementById('knockout-right-col');
+    const finalBox = document.getElementById('knockout-final-box');
+    if (!leftCol || !rightCol || !finalBox) return;
+
+    const dataForUser = currentMode === 'real' ? realResults : userPredictions;
+
+    leftCol.innerHTML = buildKnockoutColumnHtml('left', realResults, dataForUser);
+    rightCol.innerHTML = buildKnockoutColumnHtml('right', realResults, dataForUser);
+
+    const finalMatch = knockoutData.final.matches[0];
+    finalBox.innerHTML = `<div class="ko-round-title">🏆 ${knockoutData.final.name} - ${knockoutData.final.date}</div>` +
+        renderKnockoutMatchBox(finalMatch, realResults, dataForUser);
+
+    if (!skipBadge) renderKnockoutBadge(realResults, userPredictions);
+}
+
+// =================================================================
+// قفل/فتح مباراة خروج مغلوب معيّنة يدوياً (نفس فكرة دور المجموعات)
+// =================================================================
+function toggleKnockoutMatchLock(matchId, isCurrentlyLocked) {
+    if (!firebaseReady) return;
+    let newState = !isCurrentlyLocked;
+
+    db.collection("worldcup2026").doc("knockout_real").get().then(doc => {
+        let data = doc.exists ? doc.data() : {};
+        let matchData = data[matchId] || { a: "", b: "" };
+        matchData.isLocked = newState;
+
+        db.collection("worldcup2026").doc("knockout_real").set({ [matchId]: matchData }, { merge: true })
+            .then(() => loadKnockoutData())
+            .catch(err => { console.error(err); alert("❌ حدث خطأ أثناء محاولة تعديل قفل المباراة."); });
+    });
+}
+
+// =================================================================
+// حفظ بيانات خروج المغلوب (نتائج حقيقية من المالك أو توقعات من اللاعب)
+// =================================================================
+function saveKnockoutData() {
+    if (!firebaseReady) return alert("⚠️ لم يتم ضبط Firebase.");
+
+    db.collection("worldcup2026").doc("knockout_real").get().then(realDoc => {
+        let latestReal = realDoc.exists ? realDoc.data() : {};
+        let dataToSave = {};
+        let hasInvalid = false;
+        let blockedLockedMatch = false;
+
+        knockoutRoundOrder.forEach(rk => {
+            knockoutData[rk].matches.forEach(m => {
+                const inputA = document.getElementById(`ko-inputA-${m.id}`);
+                const inputB = document.getElementById(`ko-inputB-${m.id}`);
+                if (!inputA || !inputB) return;
+
+                const realM = latestReal[m.id];
+                const isRealExist = realM && isValidScore(realM.a) && isValidScore(realM.b);
+                const isManualLocked = realM && realM.isLocked === true;
+
+                if (currentMode === 'predict' && (isRealExist || isManualLocked)) {
+                    blockedLockedMatch = true;
+                    return;
+                }
+
+                const valA = inputA.value.trim();
+                const valB = inputB.value.trim();
+                inputA.classList.remove('invalid');
+                inputB.classList.remove('invalid');
+
+                if (valA === "" && valB === "") {
+                    dataToSave[m.id] = { a: "", b: "", penaltyWinner: "", isLocked: isManualLocked };
+                    return;
+                }
+
+                if (!isValidScore(valA) || !isValidScore(valB)) {
+                    inputA.classList.add('invalid');
+                    inputB.classList.add('invalid');
+                    hasInvalid = true;
+                    return;
+                }
+
+                const isDraw = parseInt(valA, 10) === parseInt(valB, 10);
+                const penaltyWinner = isDraw ? (knockoutPendingPenalties[m.id] || "") : "";
+
+                dataToSave[m.id] = { a: valA, b: valB, penaltyWinner: penaltyWinner, isLocked: isManualLocked };
+            });
+        });
+
+        if (hasInvalid) return alert("⚠️ تحقق من النتائج: يجب إدخال أعداد صحيحة غير سالبة.");
+
+        let docName = currentMode === 'real' ? "knockout_real" : `knockout_predict_${currentUser}`;
+        db.collection("worldcup2026").doc(docName).set(dataToSave, { merge: true }).then(() => {
+            knockoutPendingPenalties = {};
+            if (blockedLockedMatch) alert("💾 تم الحفظ. ملاحظة: بعض المباريات كانت مقفلة بالفعل فلم يتم تعديلها.");
+            else alert("💾 تم حفظ بيانات خروج المغلوب بنجاح!");
+            loadKnockoutData();
+        }).catch(err => {
+            console.error(err);
+            alert("❌ حدث خطأ أثناء الحفظ.");
+        });
+    });
+}
+
 function saveDataToCloud() {
     if (!firebaseReady) return alert("⚠️ لم يتم ضبط Firebase.");
 
@@ -828,51 +1251,71 @@ function updateLeaderboard() {
     db.collection("worldcup2026").doc("real_results").get().then(realDoc => {
         let real = realDoc.exists ? realDoc.data() : {};
 
-        db.collection("worldcup2026").get().then(querySnapshot => {
-            let scores = [];
-            querySnapshot.forEach(doc => {
-                if (doc.id.startsWith("predict_")) {
-                    let user = doc.id.replace("predict_", "");
-                    if (user.toLowerCase() === ADMIN_USERNAME) return;
+        db.collection("worldcup2026").doc("knockout_real").get().then(koRealDoc => {
+            let koReal = koRealDoc.exists ? koRealDoc.data() : {};
 
-                    let userPreds = doc.data();
-                    let totalPoints = 0;
+            db.collection("worldcup2026").get().then(querySnapshot => {
+                let scores = [];
+                let koPredictionsByUser = {};
 
-                    Object.keys(real).forEach(mId => {
-                        const realResult = real[mId];
-                        const userPred = userPreds[mId];
-                        if (
-                            userPred && isValidScore(userPred.a) && isValidScore(userPred.b) &&
-                            realResult && isValidScore(realResult.a) && isValidScore(realResult.b)
-                        ) {
-                            let pa = parseInt(userPred.a, 10), pb = parseInt(userPred.b, 10);
-                            let ra = parseInt(realResult.a, 10), rb = parseInt(realResult.b, 10);
-                            totalPoints += pointsForPrediction(pa, pb, ra, rb, userPred.auto, userPred.isJoker);
-                        }
-                    });
+                querySnapshot.forEach(doc => {
+                    if (doc.id.startsWith("knockout_predict_")) {
+                        koPredictionsByUser[doc.id.replace("knockout_predict_", "")] = doc.data();
+                    }
+                });
 
-                    Object.keys(groupsData).forEach(g => {
-                        totalPoints += computeGroupBonus(g, real, userPreds);
-                    });
+                querySnapshot.forEach(doc => {
+                    if (doc.id.startsWith("predict_")) {
+                        let user = doc.id.replace("predict_", "");
+                        if (user.toLowerCase() === ADMIN_USERNAME) return;
 
-                    scores.push({ user, points: totalPoints });
-                }
-            });
+                        let userPreds = doc.data();
+                        let totalPoints = 0;
 
-            if (scores.length === 0) return renderLeaderboard([]);
+                        Object.keys(real).forEach(mId => {
+                            const realResult = real[mId];
+                            const userPred = userPreds[mId];
+                            if (
+                                userPred && isValidScore(userPred.a) && isValidScore(userPred.b) &&
+                                realResult && isValidScore(realResult.a) && isValidScore(realResult.b)
+                            ) {
+                                let pa = parseInt(userPred.a, 10), pb = parseInt(userPred.b, 10);
+                                let ra = parseInt(realResult.a, 10), rb = parseInt(realResult.b, 10);
+                                totalPoints += pointsForPrediction(pa, pb, ra, rb, userPred.auto, userPred.isJoker);
+                            }
+                        });
 
-            Promise.all(
-                scores.map(s =>
-                    db.collection("users_passwords").doc(s.user).get().then(udoc => ({
-                        name: (udoc.exists && udoc.data().displayName) ? udoc.data().displayName : s.user,
-                        points: s.points,
-                        previousPosition: (udoc.exists && udoc.data().previousPosition) ? udoc.data().previousPosition : ""
-                    })).catch(() => ({ name: s.user, points: s.points, previousPosition: "" }))
-                )
-            ).then(finalScores => {
-                finalScores.sort((a, b) => b.points - a.points);
-                renderLeaderboard(finalScores);
-            });
+                        Object.keys(groupsData).forEach(g => {
+                            totalPoints += computeGroupBonus(g, real, userPreds);
+                        });
+
+                        // ✅ إضافة نقاط مرحلة خروج المغلوب لهذا اللاعب
+                        const koPreds = koPredictionsByUser[user] || {};
+                        knockoutRoundOrder.forEach(rk => {
+                            knockoutData[rk].matches.forEach(m => {
+                                totalPoints += pointsForKnockoutPrediction(koPreds[m.id], koReal[m.id]);
+                            });
+                        });
+
+                        scores.push({ user, points: totalPoints });
+                    }
+                });
+
+                if (scores.length === 0) return renderLeaderboard([]);
+
+                Promise.all(
+                    scores.map(s =>
+                        db.collection("users_passwords").doc(s.user).get().then(udoc => ({
+                            name: (udoc.exists && udoc.data().displayName) ? udoc.data().displayName : s.user,
+                            points: s.points,
+                            previousPosition: (udoc.exists && udoc.data().previousPosition) ? udoc.data().previousPosition : ""
+                        })).catch(() => ({ name: s.user, points: s.points, previousPosition: "" }))
+                    )
+                ).then(finalScores => {
+                    finalScores.sort((a, b) => b.points - a.points);
+                    renderLeaderboard(finalScores);
+                });
+            }).catch(err => console.error(err));
         }).catch(err => console.error(err));
     }).catch(err => console.error(err));
 }

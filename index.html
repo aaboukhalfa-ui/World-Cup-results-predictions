@@ -100,11 +100,20 @@
                 </table>
             </div>
 
-            <div id="knockout-view" class="knockout-placeholder" style="display:none;">
-                <div class="knockout-icon">🏆</div>
-                <h3>مرحلة خروج المغلوب (Knockout Stage)</h3>
-                <p class="knockout-msg">غير متاح حالياً</p>
-                <p class="knockout-sub">سيتم تفعيل هذه المرحلة بعد انتهاء دور المجموعات</p>
+            <div id="knockout-view" style="display:none;">
+                <div class="stats-badge" id="knockout-accuracy-badge">🎯 نقاط تحدي خروج المغلوب الخاصة بك: 0 نقطة</div>
+                <button class="btn" id="ko-save-btn" onclick="saveKnockoutData()">حفظ توقعاتي 💾</button>
+
+                <div id="knockout-bracket-container" class="ko-bracket">
+                    <div class="ko-side-column" id="knockout-left-col"></div>
+
+                    <div class="ko-center-column">
+                        <div class="ko-trophy">🏆</div>
+                        <div id="knockout-final-box"></div>
+                    </div>
+
+                    <div class="ko-side-column" id="knockout-right-col"></div>
+                </div>
             </div>
 
             <div id="predictions-view" style="display:none;">

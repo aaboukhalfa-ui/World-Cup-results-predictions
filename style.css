@@ -19,12 +19,33 @@ header h1 { color: var(--accent-gold); margin-bottom: 5px; }
 .logout-btn:hover { background-color: var(--danger); }
 @media (max-width: 600px) { .logout-btn { position: static; transform: none; margin-top: 10px; } .header-top { flex-direction: column; } }
 
-/* مرحلة خروج المغلوب */
-.knockout-placeholder { text-align: center; padding: 60px 20px; }
-.knockout-icon { font-size: 3.5rem; margin-bottom: 15px; opacity: 0.5; }
-.knockout-placeholder h3 { color: var(--accent-gold); margin-bottom: 15px; font-size: 1.4rem; }
-.knockout-msg { font-size: 1.6rem; font-weight: bold; color: var(--danger); margin-bottom: 10px; }
-.knockout-sub { color: var(--text-muted); font-size: 0.95rem; }
+/* مرحلة خروج المغلوب - القوس الكامل */
+.ko-bracket { display: grid; grid-template-columns: 1fr auto 1fr; gap: 15px; align-items: start; margin-top: 15px; }
+@media (max-width: 1000px) { .ko-bracket { grid-template-columns: 1fr; } }
+
+.ko-side-column { display: flex; flex-direction: column; gap: 25px; }
+.ko-center-column { display: flex; flex-direction: column; align-items: center; gap: 15px; padding: 20px 10px; min-width: 160px; }
+.ko-trophy { font-size: 3.5rem; filter: drop-shadow(0 0 12px rgba(212,175,55,0.6)); }
+
+.ko-round-column { display: flex; flex-direction: column; gap: 12px; }
+.ko-round-title { color: var(--accent-gold); font-weight: bold; font-size: 0.95rem; text-align: center; border-bottom: 1px solid #142c19; padding-bottom: 6px; margin-bottom: 4px; }
+
+.ko-match-box { background-color: #112415; border: 1px solid var(--accent-gold); border-radius: 8px; padding: 10px 12px; position: relative; }
+.ko-match-date { font-size: 0.7rem; color: var(--text-muted); text-align: center; margin-bottom: 6px; }
+.ko-team-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; }
+.ko-team-name { font-size: 0.88rem; overflow-wrap: anywhere; flex: 1; }
+.tbd-team { color: var(--text-muted); font-style: italic; }
+.ko-vs-sep { text-align: center; font-size: 0.7rem; color: var(--text-muted); margin: 2px 0; }
+.ko-score-input { width: 40px; flex-shrink: 0; }
+
+.penalty-box { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #1c3d24; text-align: center; }
+.penalty-label { display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 6px; }
+.penalty-pick-btn { background-color: #060c07; border: 1px solid var(--text-muted); color: var(--text-light); padding: 5px 10px; border-radius: 6px; font-size: 0.78rem; margin: 0 3px; cursor: pointer; transition: all 0.2s; }
+.penalty-pick-btn.selected { background-color: var(--accent-gold); color: #060c07; border-color: var(--accent-gold); font-weight: bold; }
+.penalty-pick-btn:disabled { cursor: not-allowed; opacity: 0.6; }
+
+#knockout-final-box .ko-match-box { border-color: var(--accent-gold); box-shadow: 0 0 15px rgba(212,175,55,0.25); }
+#ko-save-btn { margin-bottom: 20px; }
 
 /* تقسيم الصفحة إلى جانبين */
 .main-layout { display: grid; grid-template-columns: 300px 1fr; gap: 20px; max-width: 1400px; margin: 0 auto; }
